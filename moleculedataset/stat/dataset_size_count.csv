@@ -1,0 +1,6 @@
+Subset,Level of Theory,Entries,Supplementary Metrics
+Hessian,B3LYP-D3(BJ)/DZVP,"3,102,537",
+Hessian Relax,B3LYP-D3(BJ)/DZVP,"4,811,722","(281,123,880 steps)"
+TorsionScan,B3LYP-D3(BJ)/DZVP,"4,192,791","(2,436,985 molecules, 93,994,576 constraints)"
+TorsionScanRelax,B3LYP-D3(BJ)/DZVP,"4,914,677","(3,090,560 molecules, 110,235,160 constraints, 2,993,685,868 steps)"
+MBIS,PBE0/def2-TZVPD(or DZVP for I atoms),"3,082,151",

@@ -1,0 +1,7 @@
+5
+Properties=species:S:1:pos:R:3 prop_s_m_Source_File=water-toluene-ligands.mol2 prop_s_m_entry_id=159 prop_s_m_entry_name=water-toluene-ligands.159 prop_i_m_Source_File_Index=159 prop_i_m_ct_format=2 mapped_smiles="[F:1][C@:2]([Cl:3])([Cl:4])[F:5]" pbc="F F F"
+F        0.91370000      -0.89800000      -0.72230000
+C        0.00250000      -0.13680000      -0.11580000
+Cl      -0.80010000       0.89660000      -1.33190000
+Cl       0.80180000       0.83490000       1.15230000
+F       -0.90620000      -0.93130000       0.45040000
