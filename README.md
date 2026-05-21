@@ -1,31 +1,57 @@
-<div align="center">
- 👋 Hi, everyone! 
-    <br>
-    We are <b>ByteDance Seed team.</b>
-</div>
+# Benchmarking THEMol Hessians
 
-<p align="center">
-  You can get to know us better through the following channels👇
-  <br>
-  <a href="https://seed.bytedance.com/">
-    <img src="https://img.shields.io/badge/Website-%231e37ff?style=for-the-badge&logo=bytedance&logoColor=white"></a>
-  <a href="https://github.com/user-attachments/assets/5793e67c-79bb-4a59-811a-fcc7ed510bd4">
-    <img src="https://img.shields.io/badge/WeChat-07C160?style=for-the-badge&logo=wechat&logoColor=white"></a>
- <a href="https://www.xiaohongshu.com/user/profile/668e7e15000000000303157d?xsec_token=ABl2-aqekpytY6A8TuxjrwnZskU-6BsMRE_ufQQaSAvjc%3D&xsec_source=pc_search">
-    <img src="https://img.shields.io/badge/Xiaohongshu-%23FF2442?style=for-the-badge&logo=xiaohongshu&logoColor=white"></a>
-  <a href="https://www.zhihu.com/org/dou-bao-da-mo-xing-tuan-dui/">
-    <img src="https://img.shields.io/badge/zhihu-%230084FF?style=for-the-badge&logo=zhihu&logoColor=white"></a>
-</p>
+The goal of this repo is to recalculate some of the .h5 Hessians here from the THEMol dataset (B3LYP-D3BJ/dzvp) with analytic Hessians at ωB97M-V/def2-TZVPD level of theory and compare. Additionally we might compare to UMA autograd Hessians and GFN2-xTB and g-xTB numerical Hessians.
 
-![seed logo](https://github.com/user-attachments/assets/c42e675e-497c-4508-8bb9-093ad4d1f216)
+## PySCF wB97
+```bash
+for s in 47783 3860 220 1229 316 35 67 26 33 11; do sbatch calculate_pyscf_sample.sbatch hessian_0.h5 "$s" "results/no_df/hessian_0_sample_${s}_pyscf.h5"; done
+
+for s in 47783 3860 220 1229 316 35 67 26 33 11; do sbatch calculate_pyscf_sample.sbatch hessian_0.h5 "$s" "results/df/hessian_0_sample_${s}_pyscf_df.h5" --density-fit; done
+```
+
+We used samples from the THEMol `Hessian` dataset, specifically `hessian_0.h5`.
+
+Level of theory for the PySCF recalculations: `ωB97M-V/def2-TZVPD`
+- Functional: `wb97m-v`
+- Basis: `def2-tzvpd`
+- Grid level: `4`
+- NLC grid level: `3`
+- SCF tolerance: `1e-10`
+
+Completed jobs:
+
+| sample | atoms | no DF | DF |
+| ---: | ---: | ---: | ---: |
+| `47783` | 3 | `00:02:21` | `00:02:10` |
+| `3860` | 5 | `00:02:18` | `00:02:15` |
+| `220` | 8 | `00:25:37` | `00:24:50` |
+| `1229` | 10 | `00:45:44` | `00:44:55` |
+| `316` | 12 | `02:40:25` | `02:40:20` |
+| `35` | 15 | `03:05:18` | `03:05:14` |
+| `67` | 18 | `05:46:47` | `05:33:15` |
+
+
+```bash
+uv run python plot_pyscf_comparisons.py
+```
+
+
+## ORCA wB97
+```bash
+./submit_orca_readme_samples.sh hessian_0.h5 results/orca_wb97m_d4_def2_tzvpd
+```
+
+## GFN2-xTB
+
+```bash
+for s in 47783 3860 220 1229 316 35 67 26 33 11; do sbatch --time=01:00:00 calculate_xtb_sample.sbatch hessian_0.h5 "$s" "results/xtb_gfn2/hessian_0_sample_${s}_xtb_gfn2.h5"; done
+```
 
 # THEMol: Torsion, Hessian, Energy of Molecules
 
 <p align="center">
   <a href="https://opensource.org/licenses/Apache-2.0">
-    <img src="https://img.shields.io/badge/Code%20License-Apache%202.0-blue"></a>
   <a href="https://creativecommons.org/licenses/by-nc/4.0/">
-    <img src="https://img.shields.io/badge/Data%20License-CC--BY--NC-blue"></a>
 </p>
 
 We are extremely delighted to release **THEMol** (Torsion, Hessian, and Energy of Molecules). THEMol is an open-source collection of quantum mechanical properties tailored for organic molecules, providing an unprecedented exploration of the intramolecular potential energy surface of organic molecules with up to 50 heavy atoms. 

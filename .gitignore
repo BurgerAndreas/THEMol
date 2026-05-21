@@ -161,3 +161,12 @@ cython_debug/
 
 # data
 data/
+
+*.err
+*.log
+*.out
+
+results/
+xtb_work/
+orca_work/
+*.h5

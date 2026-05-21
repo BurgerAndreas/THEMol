@@ -1,0 +1,251 @@
+{
+  "source_files": [
+    "hessian_0.h5",
+    "hessian_1.h5",
+    "hessian_2.h5",
+    "hessian_3.h5",
+    "hessian_4.h5",
+    "hessian_5.h5",
+    "hessian_6.h5",
+    "hessian_7.h5",
+    "hessian_8.h5",
+    "hessian_9.h5"
+  ],
+  "scanned_at": "2026-05-20T16:39:25Z",
+  "notes": [
+    "Each HDF5 file contains many molecule groups.",
+    "For every molecule checked, hessian shape matched 3N x 3N, where N is the atom count.",
+    "Formula strings use Hill order: C, H, then other elements alphabetically."
+  ],
+  "totals": {
+    "hessians": 618947,
+    "atom_count_min": 2,
+    "atom_count_median": 30,
+    "atom_count_max": 70,
+    "hessian_dimension_min": [6, 6],
+    "hessian_dimension_max": [210, 210],
+    "hdf5_size_approx_gb": 45
+  },
+  "files": [
+    {
+      "file": "hessian_0.h5",
+      "molecules": 61796,
+      "atom_count_min": 3,
+      "atom_count_median": 30.0,
+      "atom_count_max": 70,
+      "hessian_dimension_min": [9, 9],
+      "hessian_dimension_max": [210, 210],
+      "unique_formulas": 24705,
+      "top_formulas": [
+        {"formula": "C12H14N2O", "count": 62},
+        {"formula": "C13H16N2O", "count": 58},
+        {"formula": "C13H17NO", "count": 56},
+        {"formula": "C12H15NO", "count": 53},
+        {"formula": "C13H14N2O", "count": 52},
+        {"formula": "C11H14N2O", "count": 50},
+        {"formula": "C10H11N3O", "count": 49},
+        {"formula": "C12H15NO2", "count": 49},
+        {"formula": "C13H16N2O2", "count": 48},
+        {"formula": "C11H15N3O", "count": 47}
+      ]
+    },
+    {
+      "file": "hessian_1.h5",
+      "molecules": 61563,
+      "atom_count_min": 4,
+      "atom_count_median": 30,
+      "atom_count_max": 69,
+      "hessian_dimension_min": [12, 12],
+      "hessian_dimension_max": [207, 207],
+      "unique_formulas": 24744,
+      "top_formulas": [
+        {"formula": "C12H15NO2", "count": 60},
+        {"formula": "C13H16N2O2", "count": 57},
+        {"formula": "C13H16N2O", "count": 54},
+        {"formula": "C11H13N3O", "count": 53},
+        {"formula": "C11H14N2O", "count": 50},
+        {"formula": "C13H15N3O", "count": 49},
+        {"formula": "C10H18N2O", "count": 49},
+        {"formula": "C14H16N2O", "count": 48},
+        {"formula": "C13H15NO2", "count": 47},
+        {"formula": "C12H15NO", "count": 47}
+      ]
+    },
+    {
+      "file": "hessian_2.h5",
+      "molecules": 62020,
+      "atom_count_min": 2,
+      "atom_count_median": 30.0,
+      "atom_count_max": 70,
+      "hessian_dimension_min": [6, 6],
+      "hessian_dimension_max": [210, 210],
+      "unique_formulas": 24791,
+      "top_formulas": [
+        {"formula": "C13H16N2O", "count": 72},
+        {"formula": "C11H14N2O", "count": 61},
+        {"formula": "C12H15NO", "count": 56},
+        {"formula": "C12H15NO2", "count": 54},
+        {"formula": "C14H16N2O", "count": 52},
+        {"formula": "C14H17NO", "count": 50},
+        {"formula": "C13H18N2O", "count": 50},
+        {"formula": "C13H14N2O2", "count": 50},
+        {"formula": "C13H16N2O2", "count": 49},
+        {"formula": "C10H18N2O2", "count": 49}
+      ]
+    },
+    {
+      "file": "hessian_3.h5",
+      "molecules": 61510,
+      "atom_count_min": 2,
+      "atom_count_median": 30.0,
+      "atom_count_max": 70,
+      "hessian_dimension_min": [6, 6],
+      "hessian_dimension_max": [210, 210],
+      "unique_formulas": 24706,
+      "top_formulas": [
+        {"formula": "C11H13N3O", "count": 54},
+        {"formula": "C12H14N2O", "count": 54},
+        {"formula": "C11H15N3O", "count": 52},
+        {"formula": "C11H14N2O", "count": 50},
+        {"formula": "C12H16N2O", "count": 48},
+        {"formula": "C13H16N2O", "count": 46},
+        {"formula": "C13H15N3O", "count": 45},
+        {"formula": "C13H15NO2", "count": 45},
+        {"formula": "C13H14N2O", "count": 45},
+        {"formula": "C11H12N2O2", "count": 44}
+      ]
+    },
+    {
+      "file": "hessian_4.h5",
+      "molecules": 62090,
+      "atom_count_min": 2,
+      "atom_count_median": 30.0,
+      "atom_count_max": 70,
+      "hessian_dimension_min": [6, 6],
+      "hessian_dimension_max": [210, 210],
+      "unique_formulas": 24905,
+      "top_formulas": [
+        {"formula": "C13H17NO", "count": 58},
+        {"formula": "C11H13N3O", "count": 57},
+        {"formula": "C13H16N2O", "count": 54},
+        {"formula": "C13H15N3O", "count": 53},
+        {"formula": "C12H15NO2", "count": 51},
+        {"formula": "C12H14N2O2", "count": 50},
+        {"formula": "C13H16N2O2", "count": 50},
+        {"formula": "C9H16N2O", "count": 49},
+        {"formula": "C12H13N3O", "count": 48},
+        {"formula": "C12H16N2O", "count": 48}
+      ]
+    },
+    {
+      "file": "hessian_5.h5",
+      "molecules": 61731,
+      "atom_count_min": 3,
+      "atom_count_median": 30,
+      "atom_count_max": 70,
+      "hessian_dimension_min": [9, 9],
+      "hessian_dimension_max": [210, 210],
+      "unique_formulas": 24727,
+      "top_formulas": [
+        {"formula": "C13H14N2O", "count": 76},
+        {"formula": "C11H13N3O", "count": 55},
+        {"formula": "C12H14N2O", "count": 55},
+        {"formula": "C13H16N2O", "count": 54},
+        {"formula": "C11H14N2O", "count": 54},
+        {"formula": "C12H16N2O", "count": 53},
+        {"formula": "C11H15NO", "count": 51},
+        {"formula": "C12H15N3O", "count": 50},
+        {"formula": "C10H15N3O", "count": 47},
+        {"formula": "C13H18N2O", "count": 46}
+      ]
+    },
+    {
+      "file": "hessian_6.h5",
+      "molecules": 61825,
+      "atom_count_min": 3,
+      "atom_count_median": 30,
+      "atom_count_max": 70,
+      "hessian_dimension_min": [9, 9],
+      "hessian_dimension_max": [210, 210],
+      "unique_formulas": 24709,
+      "top_formulas": [
+        {"formula": "C12H14N2O", "count": 59},
+        {"formula": "C11H13N3O", "count": 58},
+        {"formula": "C12H16N2O", "count": 53},
+        {"formula": "C13H16N2O", "count": 52},
+        {"formula": "C13H15NO", "count": 52},
+        {"formula": "C12H13NO2", "count": 52},
+        {"formula": "C13H14N2O2", "count": 51},
+        {"formula": "C14H18N2O", "count": 51},
+        {"formula": "C13H18N2O", "count": 50},
+        {"formula": "C12H15NO", "count": 49}
+      ]
+    },
+    {
+      "file": "hessian_7.h5",
+      "molecules": 61858,
+      "atom_count_min": 3,
+      "atom_count_median": 30.0,
+      "atom_count_max": 70,
+      "hessian_dimension_min": [9, 9],
+      "hessian_dimension_max": [210, 210],
+      "unique_formulas": 24675,
+      "top_formulas": [
+        {"formula": "C12H14N2O", "count": 62},
+        {"formula": "C12H16N2O", "count": 60},
+        {"formula": "C13H16N2O", "count": 59},
+        {"formula": "C11H15N3O", "count": 56},
+        {"formula": "C10H17NO2", "count": 54},
+        {"formula": "C11H14N2O", "count": 51},
+        {"formula": "C14H16N2O2", "count": 49},
+        {"formula": "C12H16N2O2", "count": 49},
+        {"formula": "C9H16N2O2", "count": 48},
+        {"formula": "C13H15NO2", "count": 47}
+      ]
+    },
+    {
+      "file": "hessian_8.h5",
+      "molecules": 62193,
+      "atom_count_min": 4,
+      "atom_count_median": 30,
+      "atom_count_max": 70,
+      "hessian_dimension_min": [12, 12],
+      "hessian_dimension_max": [210, 210],
+      "unique_formulas": 24690,
+      "top_formulas": [
+        {"formula": "C10H11N3O", "count": 61},
+        {"formula": "C12H16N2O", "count": 58},
+        {"formula": "C11H15N3O", "count": 56},
+        {"formula": "C13H16N2O", "count": 53},
+        {"formula": "C14H18N2O", "count": 53},
+        {"formula": "C13H14N2O", "count": 51},
+        {"formula": "C11H14N2O", "count": 51},
+        {"formula": "C14H16N2O", "count": 48},
+        {"formula": "C8H15NO", "count": 48},
+        {"formula": "C13H17NO2", "count": 46}
+      ]
+    },
+    {
+      "file": "hessian_9.h5",
+      "molecules": 62361,
+      "atom_count_min": 3,
+      "atom_count_median": 30,
+      "atom_count_max": 70,
+      "hessian_dimension_min": [9, 9],
+      "hessian_dimension_max": [210, 210],
+      "unique_formulas": 24891,
+      "top_formulas": [
+        {"formula": "C12H16N2O", "count": 56},
+        {"formula": "C12H14N2O", "count": 55},
+        {"formula": "C13H16N2O", "count": 53},
+        {"formula": "C11H15N3O", "count": 52},
+        {"formula": "C14H16N2O", "count": 50},
+        {"formula": "C11H14N2O", "count": 50},
+        {"formula": "C12H15NO2", "count": 50},
+        {"formula": "C10H14N2O", "count": 47},
+        {"formula": "C13H15N3O", "count": 47},
+        {"formula": "C13H17N3O", "count": 46}
+      ]
+    }
+  ]
+}
