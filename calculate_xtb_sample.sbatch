@@ -4,8 +4,7 @@
 #SBATCH --time=23:30:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --exclusive
-#SBATCH --mem=0
+#SBATCH --cpus-per-task=8
 #SBATCH --output=xtb_hessian_%j.out
 #SBATCH --error=xtb_hessian_%j.err
 

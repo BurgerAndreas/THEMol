@@ -29,6 +29,9 @@ Completed jobs:
 | `316` | 12 | `02:40:25` | `02:40:20` |
 | `35` | 15 | `03:05:18` | `03:05:14` |
 | `67` | 18 | `05:46:47` | `05:33:15` |
+| `26` | 20 | `09:29:39` | `09:27:57` |
+| `33` | 24 | `18:36:25` | `18:52:01` |
+| `11` | 28 | `>24:00:00` timeout | `>24:00:00` timeout |
 
 
 ```bash
@@ -45,6 +48,51 @@ uv run python plot_pyscf_comparisons.py
 
 ```bash
 for s in 47783 3860 220 1229 316 35 67 26 33 11; do sbatch --time=01:00:00 calculate_xtb_sample.sbatch hessian_0.h5 "$s" "results/xtb_gfn2/hessian_0_sample_${s}_xtb_gfn2.h5"; done
+```
+
+Completed jobs:
+
+| sample | atoms | GFN2-xTB |
+| ---: | ---: | ---: |
+| `47783` | 3 | `00:00:15` |
+| `3860` | 5 | `00:00:12` |
+| `220` | 8 | `00:00:15` |
+| `1229` | 10 | `00:00:12` |
+| `316` | 12 | `00:00:16` |
+| `35` | 15 | `00:00:15` |
+| `67` | 18 | `00:00:12` |
+| `26` | 20 | `00:00:15` |
+| `33` | 24 | `00:00:16` |
+| `11` | 28 | `00:00:18` |
+
+## g-xTB
+
+g-xTB requires the modified xTB binary with `--gxtb` support. On the cluster, use the user-local static Linux x86_64 binary installed at `$HOME/software/gxtb/xtb-6.7.1/bin/xtb`.
+
+Run all README Hessian samples inside one 2-hour Slurm allocation:
+
+```bash
+G_XTB_COMMAND="$HOME/software/gxtb/xtb-6.7.1/bin/xtb" sbatch calculate_gxtb_readme_samples.sbatch hessian_0.h5 results/gxtb
+```
+
+## UMA
+
+UMA Hessians are computed with FAIRChem's inference-time autograd Hessian support for the `omol` task and benchmarked against the PySCF `ωB97M-V/def2-TZVPD` no-density-fitting results as the ground truth. Use a separate UMA virtual environment so the PySCF, ORCA, and xTB environment keeps the existing `numpy` and `h5py` versions.
+
+```bash
+uv venv .venv-uma --python 3.11
+uv pip install --python .venv-uma/bin/python -e . fairchem-core huggingface-hub
+uv run --no-project --python .venv-uma/bin/python hf auth login
+```
+
+```bash
+sbatch calculate_uma_sample.sbatch hessian_0.h5
+```
+
+If the vmap Hessian path runs out of GPU memory, use the lower-memory loop implementation:
+
+```bash
+sbatch calculate_uma_sample.sbatch hessian_0.h5 -- --hessian-loop
 ```
 
 # THEMol: Torsion, Hessian, Energy of Molecules

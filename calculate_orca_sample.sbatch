@@ -3,9 +3,7 @@
 #SBATCH --account=rrg-aspuru
 #SBATCH --time=23:30:00
 #SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --exclusive
-#SBATCH --mem=0
+#SBATCH --ntasks=32
 #SBATCH --output=orca_hessian_%j.out
 #SBATCH --error=orca_hessian_%j.err
 
@@ -25,14 +23,14 @@ cd "${SLURM_SUBMIT_DIR}"
 
 module load StdEnv/2023 gcc/12.3 openmpi/4.1.5 orca/6.1.1
 
-THREADS="${SLURM_CPUS_ON_NODE:-${SLURM_CPUS_PER_TASK:-1}}"
+THREADS="${SLURM_NTASKS:-1}"
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
 # ORCA %maxcore is per MPI process. Use most of the node while leaving headroom.
-MAXCORE_MB="${ORCA_MAXCORE_MB:-$(awk -v n="${THREADS}" '/MemTotal/ {printf "%d", (($2 / 1024) * 0.75) / n}' /proc/meminfo)}"
+MAXCORE_MB="${ORCA_MAXCORE_MB:-$(awk -v n="${THREADS}" '/MemTotal/ {printf "%d", (($2 / 1024) * 0.50) / n}' /proc/meminfo)}"
 WORK_DIR="${ORCA_WORK_DIR:-orca_work/hessian_$(basename "${H5_FILE%.h5}")_sample_${SAMPLE_NUMBER}_${SLURM_JOB_ID}}"
 
 echo "Running on host: $(hostname)"

@@ -38,6 +38,11 @@ THEMOL_PLOT_FACTORS = {
     "force_rms": KCAL_MOL_TO_EV,
     "hessian_rms": KCAL_MOL_TO_EV,
 }
+UMA_PLOT_FACTORS = {
+    "energy": 1.0,
+    "force_rms": 1.0,
+    "hessian_rms": 1.0,
+}
 
 
 @dataclass(frozen=True)
@@ -64,12 +69,19 @@ class ModeRecord:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Make DF/no-DF and no-DF/THEMol scalar scatter plots from PySCF output HDF5 files."
+        description="Make scalar comparison plots from PySCF, THEMol, UMA, and xTB output HDF5 files."
     )
     parser.add_argument("--no-df-dir", default="results/no_df", help="Directory with no-density-fitting outputs.")
     parser.add_argument("--df-dir", default="results/df", help="Directory with density-fitting outputs.")
+    parser.add_argument("--uma-dir", default="results/uma", help="Directory with UMA outputs.")
+    parser.add_argument("--xtb-dir", default="results/xtb_gfn2", help="Directory with GFN2-xTB outputs.")
     parser.add_argument("--output-dir", default="plots/pyscf_comparisons", help="Directory for plots and CSV summary.")
     parser.add_argument("--pattern", default="*.h5", help="Glob pattern for result HDF5 files.")
+    parser.add_argument(
+        "--xtb-pattern",
+        default="hessian_0_sample_*_xtb_gfn2.h5",
+        help="Glob pattern for GFN2-xTB result HDF5 files.",
+    )
     parser.add_argument("--dpi", type=int, default=200, help="PNG resolution.")
     parser.add_argument(
         "--rot-thresh",
@@ -368,7 +380,9 @@ def negative_count_plot(rows: list[dict[str, float | int | str]], output: Path, 
 
     fig, ax = plt.subplots(figsize=(5.8, 5.4), constrained_layout=True)
     all_counts = []
-    for comparison, marker in (("ωB97M-V/def2-TZVPD w/wo Dens.Fit", "o"), ("ωB97M-V/def2-TZVPD vs B3LYP-D3BJ/dzvp", "^")):
+    markers = ("o", "^", "s", "D", "P", "X")
+    comparisons = list(dict.fromkeys(str(row["comparison"]) for row in rows))
+    for idx, comparison in enumerate(comparisons):
         subset = [row for row in rows if row["comparison"] == comparison]
         if not subset:
             continue
@@ -376,14 +390,22 @@ def negative_count_plot(rows: list[dict[str, float | int | str]], output: Path, 
         ys = [int(row["comparison_negative_eigenvalues"]) for row in subset]
         all_counts.extend(xs)
         all_counts.extend(ys)
-        ax.scatter(xs, ys, s=58, marker=marker, label=comparison, edgecolors="black", linewidths=0.5)
+        ax.scatter(
+            xs,
+            ys,
+            s=58,
+            marker=markers[idx % len(markers)],
+            label=comparison,
+            edgecolors="black",
+            linewidths=0.5,
+        )
     if all_counts:
         lo = min(all_counts)
         hi = max(all_counts)
         ax.plot([lo, hi], [lo, hi], linestyle="--", linewidth=1, color="0.35", label="same count")
         ax.set_xlim(lo - 0.5, hi + 0.5)
         ax.set_ylim(lo - 0.5, hi + 0.5)
-    ax.set_xlabel("No-DF negative eigenvalue count")
+    ax.set_xlabel("Baseline negative eigenvalue count")
     ax.set_ylabel("Comparison negative eigenvalue count")
     ax.legend(loc="best")
     ax.grid(True, alpha=0.25)
@@ -527,7 +549,13 @@ def eckart_summary_rows(
     return rows
 
 
-def write_summary_csv(output: Path, no_df: dict[int, ResultRecord], df: dict[int, ResultRecord]) -> None:
+def write_summary_csv(
+    output: Path,
+    no_df: dict[int, ResultRecord],
+    df: dict[int, ResultRecord],
+    uma: dict[int, ResultRecord],
+    xtb: dict[int, ResultRecord],
+) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", newline="") as handle:
         writer = csv.writer(handle)
@@ -537,36 +565,54 @@ def write_summary_csv(output: Path, no_df: dict[int, ResultRecord], df: dict[int
                 "atoms",
                 "no_df_energy_hartree",
                 "df_energy_hartree",
+                "uma_energy_ev",
+                "xtb_energy_hartree",
                 "themol_energy_kcal_mol",
                 "no_df_force_rms_hartree_per_bohr",
                 "df_force_rms_hartree_per_bohr",
+                "uma_force_rms_ev_per_angstrom",
+                "xtb_force_rms_hartree_per_bohr",
                 "themol_force_rms_kcal_mol_per_angstrom",
                 "no_df_hessian_rms_hartree_per_bohr2",
                 "df_hessian_rms_hartree_per_bohr2",
+                "uma_hessian_rms_ev_per_angstrom2",
+                "xtb_hessian_rms_hartree_per_bohr2",
                 "themol_hessian_rms_kcal_mol_per_angstrom2",
                 "no_df_file",
                 "df_file",
+                "uma_file",
+                "xtb_file",
             ]
         )
-        for sample in sorted(set(no_df) | set(df)):
+        for sample in sorted(set(no_df) | set(df) | set(uma) | set(xtb)):
             no_df_record = no_df.get(sample)
             df_record = df.get(sample)
-            reference = no_df_record or df_record
+            uma_record = uma.get(sample)
+            xtb_record = xtb.get(sample)
+            reference = no_df_record or df_record or uma_record or xtb_record
             writer.writerow(
                 [
                     sample,
                     reference.atoms if reference else "",
                     no_df_record.energy if no_df_record else "",
                     df_record.energy if df_record else "",
+                    uma_record.energy if uma_record else "",
+                    xtb_record.energy if xtb_record else "",
                     reference.reference_energy if reference else "",
                     no_df_record.force_rms if no_df_record else "",
                     df_record.force_rms if df_record else "",
+                    uma_record.force_rms if uma_record else "",
+                    xtb_record.force_rms if xtb_record else "",
                     reference.reference_force_rms if reference else "",
                     no_df_record.hessian_rms if no_df_record else "",
                     df_record.hessian_rms if df_record else "",
+                    uma_record.hessian_rms if uma_record else "",
+                    xtb_record.hessian_rms if xtb_record else "",
                     reference.reference_hessian_rms if reference else "",
                     no_df_record.path if no_df_record else "",
                     df_record.path if df_record else "",
+                    uma_record.path if uma_record else "",
+                    xtb_record.path if xtb_record else "",
                 ]
             )
 
@@ -610,10 +656,14 @@ def main() -> None:
     args = parse_args()
     no_df_dir = Path(args.no_df_dir)
     df_dir = Path(args.df_dir)
+    uma_dir = Path(args.uma_dir)
+    xtb_dir = Path(args.xtb_dir)
     output_dir = Path(args.output_dir)
 
     no_df = read_records(no_df_dir, args.pattern)
     df = read_records(df_dir, args.pattern)
+    uma = read_records(uma_dir, args.pattern)
+    xtb = read_records(xtb_dir, args.xtb_pattern)
     if not no_df:
         raise SystemExit(f"No no-DF result files found in {no_df_dir}")
     if not df:
@@ -640,7 +690,20 @@ def main() -> None:
         hessian_factor=THEMOL_PLOT_FACTORS["hessian_rms"],
         rot_thresh=args.rot_thresh,
     )
-
+    uma_modes = read_mode_records(
+        uma_dir,
+        args.pattern,
+        hessian_name="hessian",
+        hessian_factor=UMA_PLOT_FACTORS["hessian_rms"],
+        rot_thresh=args.rot_thresh,
+    )
+    xtb_modes = read_mode_records(
+        xtb_dir,
+        args.xtb_pattern,
+        hessian_name="hessian",
+        hessian_factor=PYSCF_PLOT_FACTORS["hessian_rms"],
+        rot_thresh=args.rot_thresh,
+    )
     plot_specs = [
         (
             make_reference_rows(
@@ -680,6 +743,34 @@ def main() -> None:
             "THEMol Hessian RMS (eV/A^2)",
             "THEMol vs No-DF Hessian RMS",
             output_dir / "themol_vs_no_df_hessian_rms.png",
+        ),
+        (
+            make_pair_rows(
+                no_df,
+                uma,
+                "hessian_rms",
+                "hessian_rms",
+                PYSCF_PLOT_FACTORS["hessian_rms"],
+                UMA_PLOT_FACTORS["hessian_rms"],
+            ),
+            "No-DF Hessian RMS (eV/A^2)",
+            "UMA Hessian RMS (eV/A^2)",
+            "UMA vs No-DF Hessian RMS",
+            output_dir / "uma_vs_no_df_hessian_rms.png",
+        ),
+        (
+            make_pair_rows(
+                no_df,
+                xtb,
+                "hessian_rms",
+                "hessian_rms",
+                PYSCF_PLOT_FACTORS["hessian_rms"],
+                PYSCF_PLOT_FACTORS["hessian_rms"],
+            ),
+            "ωB97M-V/def2-TZVPD Hessian RMS (eV/A^2)",
+            "GFN2-xTB Hessian RMS (eV/A^2)",
+            "ωB97M-V/def2-TZVPD vs GFN2-xTB Hessian RMS",
+            output_dir / "xtb_gfn2_vs_no_df_hessian_rms.png",
         ),
     ]
 
@@ -734,6 +825,22 @@ def main() -> None:
         "reference_hessian",
         PYSCF_PLOT_FACTORS["hessian_rms"],
         THEMOL_PLOT_FACTORS["hessian_rms"],
+    ) + hessian_mae_rows(
+        no_df,
+        uma,
+        "UMA vs ωB97M-V/def2-TZVPD no-DF",
+        "hessian",
+        "hessian",
+        PYSCF_PLOT_FACTORS["hessian_rms"],
+        UMA_PLOT_FACTORS["hessian_rms"],
+    ) + hessian_mae_rows(
+        no_df,
+        xtb,
+        "ωB97M-V/def2-TZVPD vs GFN2-xTB",
+        "hessian",
+        "hessian",
+        PYSCF_PLOT_FACTORS["hessian_rms"],
+        PYSCF_PLOT_FACTORS["hessian_rms"],
     )
     if hessian_mae_by_atoms_rows:
         metric_by_atoms_plot(
@@ -751,6 +858,8 @@ def main() -> None:
     eckart_rows = (
         eckart_summary_rows(no_df_modes, df_modes, "ωB97M-V/def2-TZVPD w/wo Dens.Fit", args.negative_eigval_threshold)
         + eckart_summary_rows(no_df_modes, themol_modes, "ωB97M-V/def2-TZVPD vs B3LYP-D3BJ/dzvp", args.negative_eigval_threshold)
+        + eckart_summary_rows(no_df_modes, uma_modes, "UMA vs ωB97M-V/def2-TZVPD no-DF", args.negative_eigval_threshold)
+        + eckart_summary_rows(no_df_modes, xtb_modes, "ωB97M-V/def2-TZVPD vs GFN2-xTB", args.negative_eigval_threshold)
     )
     eckart_plot_specs = [
         (
@@ -779,11 +888,11 @@ def main() -> None:
         skipped.append("eckart_negative_eigenvalue_counts.png")
 
     summary_path = output_dir / "pyscf_comparison_metrics.csv"
-    write_summary_csv(summary_path, no_df, df)
+    write_summary_csv(summary_path, no_df, df, uma, xtb)
     eckart_summary_path = output_dir / "pyscf_eckart_summary_metrics.csv"
     write_eckart_summary_csv(eckart_summary_path, eckart_rows)
 
-    print(f"Read {len(no_df)} no-DF files and {len(df)} DF files.")
+    print(f"Read {len(no_df)} no-DF files, {len(df)} DF files, {len(uma)} UMA files, and {len(xtb)} GFN2-xTB files.")
     for output, count in written:
         print(f"Wrote {output} ({count} points)")
     for name in skipped:
