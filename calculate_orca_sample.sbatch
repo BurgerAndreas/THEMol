@@ -4,8 +4,8 @@
 #SBATCH --time=23:30:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=32
-#SBATCH --output=orca_hessian_%j.out
-#SBATCH --error=orca_hessian_%j.err
+#SBATCH --output=logs/hessians/orca/orca_hessian_%j.out
+#SBATCH --error=logs/hessians/orca/orca_hessian_%j.err
 
 set -euo pipefail
 
@@ -16,7 +16,7 @@ fi
 
 H5_FILE="$1"
 SAMPLE_NUMBER="$2"
-OUTPUT_FILE="${3:-orca_$(basename "${H5_FILE%.h5}")_sample_${SAMPLE_NUMBER}.h5}"
+OUTPUT_FILE="${3:-results/hessians/orca_wb97m_d4_def2_tzvpd/$(basename "${H5_FILE%.h5}")_sample_${SAMPLE_NUMBER}_orca_wb97m_d4_def2_tzvpd.h5}"
 EXTRA_ARGS=("${@:4}")
 
 cd "${SLURM_SUBMIT_DIR}"

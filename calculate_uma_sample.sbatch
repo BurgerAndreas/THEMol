@@ -6,8 +6,8 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --gpus-per-node=1
-#SBATCH --output=uma_hessian_%j.out
-#SBATCH --error=uma_hessian_%j.err
+#SBATCH --output=logs/hessians/uma/uma_hessian_%j.out
+#SBATCH --error=logs/hessians/uma/uma_hessian_%j.err
 
 set -euo pipefail
 
@@ -43,11 +43,12 @@ export OMP_NUM_THREADS="${THREADS}"
 export MKL_NUM_THREADS="${THREADS}"
 export OPENBLAS_NUM_THREADS="${THREADS}"
 export NUMEXPR_NUM_THREADS="${THREADS}"
+export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
 
 UMA_MODEL="${UMA_MODEL:-uma-s-1p2}"
 UMA_TASK_NAME="${UMA_TASK_NAME:-omol}"
 UMA_DEVICE="${UMA_DEVICE:-cuda}"
-UMA_OUTPUT_DIR="${UMA_OUTPUT_DIR:-results/uma}"
+UMA_OUTPUT_DIR="${UMA_OUTPUT_DIR:-results/hessians/uma}"
 UMA_PYTHON="${UMA_PYTHON:-.venv-uma/bin/python}"
 
 if [[ ! -x "${UMA_PYTHON}" ]]; then
@@ -66,6 +67,7 @@ echo "UMA model: ${UMA_MODEL}"
 echo "UMA task: ${UMA_TASK_NAME}"
 echo "UMA device: ${UMA_DEVICE}"
 echo "UMA Python: ${UMA_PYTHON}"
+echo "HF Hub offline: ${HF_HUB_OFFLINE}"
 echo "Extra args: ${EXTRA_ARGS[*]:-<none>}"
 
 uv run --no-project --python "${UMA_PYTHON}" python calculate_uma_sample.py \

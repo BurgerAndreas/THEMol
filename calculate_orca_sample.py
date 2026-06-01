@@ -27,7 +27,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "-o",
         "--output",
-        help="Output HDF5 path. Defaults to orca_<input-stem>_sample_<index>.h5.",
+        help="Output HDF5 path. Defaults to results/hessians/orca_wb97m_d4_def2_tzvpd/<input-stem>_sample_<index>_orca_wb97m_d4_def2_tzvpd.h5.",
     )
     parser.add_argument("--one-based", action="store_true", help="Interpret sample_number as one-based.")
     parser.add_argument("--functional", default="WB97M-D4", help="ORCA functional keyword.")
@@ -367,7 +367,12 @@ def main() -> None:
     if args.charge is not None or args.spin is not None:
         source = "command_line_override"
 
-    output = Path(args.output) if args.output else Path(f"orca_{h5_file.stem}_sample_{sample['sample_index']}.h5")
+    output = (
+        Path(args.output)
+        if args.output
+        else Path("results/hessians/orca_wb97m_d4_def2_tzvpd")
+        / f"{h5_file.stem}_sample_{sample['sample_index']}_orca_wb97m_d4_def2_tzvpd.h5"
+    )
     work_dir = (
         Path(args.work_dir)
         if args.work_dir

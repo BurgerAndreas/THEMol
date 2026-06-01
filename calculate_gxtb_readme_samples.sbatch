@@ -6,8 +6,8 @@
 #SBATCH --ntasks=1
 #SBATCH --exclusive
 #SBATCH --mem=0
-#SBATCH --output=gxtb_readme_hessians_%j.out
-#SBATCH --error=gxtb_readme_hessians_%j.err
+#SBATCH --output=logs/hessians/gxtb/gxtb_readme_hessians_%j.out
+#SBATCH --error=logs/hessians/gxtb/gxtb_readme_hessians_%j.err
 
 set -euo pipefail
 
@@ -17,7 +17,7 @@ if [[ $# -lt 1 ]]; then
 fi
 
 H5_FILE="$1"
-OUTPUT_DIR="${2:-results/gxtb}"
+OUTPUT_DIR="${2:-results/hessians/gxtb}"
 EXTRA_ARGS=("${@:3}")
 H5_STEM="$(basename "${H5_FILE%.h5}")"
 SAMPLES=(47783 3860 220 1229 316 35 67 26 33 11)

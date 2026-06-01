@@ -6,8 +6,8 @@
 #SBATCH --ntasks=1
 #SBATCH --exclusive
 #SBATCH --mem=0
-#SBATCH --output=gxtb_hessian_%j.out
-#SBATCH --error=gxtb_hessian_%j.err
+#SBATCH --output=logs/hessians/gxtb/gxtb_hessian_%j.out
+#SBATCH --error=logs/hessians/gxtb/gxtb_hessian_%j.err
 
 set -euo pipefail
 
@@ -24,7 +24,7 @@ fi
 
 H5_FILE="$1"
 SAMPLE_NUMBER="$2"
-OUTPUT_FILE="${3:-gxtb_$(basename "${H5_FILE%.h5}")_sample_${SAMPLE_NUMBER}.h5}"
+OUTPUT_FILE="${3:-results/hessians/gxtb/$(basename "${H5_FILE%.h5}")_sample_${SAMPLE_NUMBER}_gxtb.h5}"
 EXTRA_ARGS=("${@:4}")
 
 cd "${SLURM_SUBMIT_DIR}"

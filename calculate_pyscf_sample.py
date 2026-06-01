@@ -33,7 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "-o",
         "--output",
-        help="Output HDF5 path. Defaults to pyscf_<input-stem>_sample_<index>.h5.",
+        help="Output HDF5 path. Defaults to results/hessians/{no_df,df}/<input-stem>_sample_<index>_pyscf[_df].h5.",
     )
     parser.add_argument("--one-based", action="store_true", help="Interpret sample_number as one-based.")
     parser.add_argument("--xc", default="wb97m-v", help="PySCF DFT functional.")
@@ -291,7 +291,12 @@ def main() -> None:
     if args.charge is not None or args.spin is not None:
         source = "command_line_override"
 
-    output = Path(args.output) if args.output else Path(f"pyscf_{h5_file.stem}_sample_{sample['sample_index']}.h5")
+    if args.output:
+        output = Path(args.output)
+    else:
+        output_dir = Path("results/hessians/df" if args.density_fit else "results/hessians/no_df")
+        suffix = "pyscf_df" if args.density_fit else "pyscf"
+        output = output_dir / f"{h5_file.stem}_sample_{sample['sample_index']}_{suffix}.h5"
 
     print(f"Input file: {h5_file}")
     print(f"Sample index: {sample['sample_index']} key={sample['sample_key']}")

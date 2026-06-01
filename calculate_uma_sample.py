@@ -10,10 +10,15 @@ import platform
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 import h5py
 import numpy as np
+
+
+def log(message: str) -> None:
+    print(message, flush=True)
 
 
 def parse_args() -> argparse.Namespace:
@@ -34,7 +39,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output-dir",
-        help="Directory for per-sample output HDF5 files. Defaults to the current directory.",
+        default="results/hessians/uma",
+        help="Directory for per-sample output HDF5 files.",
     )
     parser.add_argument("--one-based", action="store_true", help="Interpret sample_number as one-based.")
     parser.add_argument("--model", default="uma-s-1p2", help="UMA model name passed to fairchem.")
@@ -277,9 +283,7 @@ def output_path_for_sample(args: argparse.Namespace, h5_file: Path, sample_index
         return Path(args.output)
 
     filename = f"{h5_file.stem}_sample_{sample_index}_{sanitized_model_name(args.model)}.h5"
-    if args.output_dir:
-        return Path(args.output_dir) / filename
-    return Path(f"uma_{filename}")
+    return Path(args.output_dir) / filename
 
 
 def sample_charge_and_spin(sample: dict[str, Any], args: argparse.Namespace) -> tuple[int, int, int, str]:
@@ -307,43 +311,51 @@ def main() -> None:
     samples = [select_sample(h5_file, sample_number, args.one_based) for sample_number in args.sample_numbers]
     sample_settings = [sample_charge_and_spin(sample, args) for sample in samples]
 
-    print(f"Input file: {h5_file}")
-    print(f"Sample count: {len(samples)}")
-    print(f"Sample indices: {', '.join(str(sample['sample_index']) for sample in samples)}")
-    print(f"UMA model/task/device: {args.model}/{args.task_name}/{args.device}")
-    print(f"Hessian mode: {'loop' if args.hessian_loop else 'vmap'}")
-    print(f"Output directory: {args.output_dir or Path.cwd()}")
+    log(f"Input file: {h5_file}")
+    log(f"Sample count: {len(samples)}")
+    log(f"Sample indices: {', '.join(str(sample['sample_index']) for sample in samples)}")
+    log(f"UMA model/task/device: {args.model}/{args.task_name}/{args.device}")
+    log(f"Hessian mode: {'loop' if args.hessian_loop else 'vmap'}")
+    log(f"Output directory: {args.output_dir or Path.cwd()}")
 
     if args.dry_run:
         for sample, (charge, _spin_difference, spin_multiplicity, source) in zip(samples, sample_settings):
             output = output_path_for_sample(args, h5_file, int(sample["sample_index"]))
-            print(
+            log(
                 f"Dry run sample {sample['sample_index']} key={sample['sample_key']} "
                 f"atoms={len(sample['atomic_numbers'])} charge/spin={charge}/{spin_multiplicity} "
                 f"source={source} output={output}"
             )
-        print("Dry run requested; stopping before UMA model load.")
+        log("Dry run requested; stopping before UMA model load.")
         return
 
+    log("Loading UMA predictor...")
+    load_start = perf_counter()
     predictor = build_predictor(args)
+    log(f"Loaded UMA predictor in {perf_counter() - load_start:.1f} s")
+
+    total_start = perf_counter()
     for index, (sample, settings) in enumerate(zip(samples, sample_settings), start=1):
         charge, spin_difference, spin_multiplicity, source = settings
         output = output_path_for_sample(args, h5_file, int(sample["sample_index"]))
 
-        print(f"[{index}/{len(samples)}] Sample index: {sample['sample_index']} key={sample['sample_key']}")
-        print(f"Atoms: {len(sample['atomic_numbers'])}")
-        print(f"SMILES: {sample['mapped_nonisomeric_smiles']}")
-        print(f"Charge/spin multiplicity: {charge}/{spin_multiplicity} ({source})")
-        print(f"Output: {output}")
+        sample_start = perf_counter()
+        log(f"[{index}/{len(samples)}] Starting sample {sample['sample_index']} key={sample['sample_key']}")
+        log(f"Atoms: {len(sample['atomic_numbers'])}")
+        log(f"SMILES: {sample['mapped_nonisomeric_smiles']}")
+        log(f"Charge/spin multiplicity: {charge}/{spin_multiplicity} ({source})")
+        log(f"Output: {output}")
 
         energy, forces, hessian = calculate_uma(sample, args, charge, spin_multiplicity, predictor)
+        log(f"[{index}/{len(samples)}] UMA calculation finished in {perf_counter() - sample_start:.1f} s; writing HDF5")
         write_results(output, sample, args, charge, spin_difference, spin_multiplicity, source, energy, forces, hessian)
 
-        print(f"Energy (eV): {energy:.16f}")
-        print(f"Force shape: {forces.shape}")
-        print(f"Gradient shape: {forces.shape}")
-        print(f"Hessian shape: {hessian.shape}")
-        print(f"Wrote {output}")
+        log(f"Energy (eV): {energy:.16f}")
+        log(f"Force shape: {forces.shape}")
+        log(f"Gradient shape: {forces.shape}")
+        log(f"Hessian shape: {hessian.shape}")
+        log(f"[{index}/{len(samples)}] Wrote {output} in {perf_counter() - sample_start:.1f} s")
+    log(f"Finished {len(samples)} samples in {perf_counter() - total_start:.1f} s")
 
 
 if __name__ == "__main__":

@@ -5,8 +5,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --output=xtb_hessian_%j.out
-#SBATCH --error=xtb_hessian_%j.err
+#SBATCH --output=logs/hessians/xtb/xtb_hessian_%j.out
+#SBATCH --error=logs/hessians/xtb/xtb_hessian_%j.err
 
 set -euo pipefail
 
@@ -17,7 +17,7 @@ fi
 
 H5_FILE="$1"
 SAMPLE_NUMBER="$2"
-OUTPUT_FILE="${3:-xtb_$(basename "${H5_FILE%.h5}")_sample_${SAMPLE_NUMBER}.h5}"
+OUTPUT_FILE="${3:-results/hessians/xtb_gfn2/$(basename "${H5_FILE%.h5}")_sample_${SAMPLE_NUMBER}_xtb_gfn2.h5}"
 EXTRA_ARGS=("${@:4}")
 
 cd "${SLURM_SUBMIT_DIR}"

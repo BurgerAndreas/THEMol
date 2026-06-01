@@ -6,8 +6,8 @@
 #SBATCH --ntasks=1
 #SBATCH --exclusive
 #SBATCH --mem=0
-#SBATCH --output=pyscf_hessian_%j.out
-#SBATCH --error=pyscf_hessian_%j.err
+#SBATCH --output=logs/hessians/pyscf/pyscf_hessian_%j.out
+#SBATCH --error=logs/hessians/pyscf/pyscf_hessian_%j.err
 
 set -euo pipefail
 
@@ -18,8 +18,19 @@ fi
 
 H5_FILE="$1"
 SAMPLE_NUMBER="$2"
-OUTPUT_FILE="${3:-pyscf_$(basename "${H5_FILE%.h5}")_sample_${SAMPLE_NUMBER}.h5}"
 EXTRA_ARGS=("${@:4}")
+OUTPUT_DIR="results/hessians/no_df"
+for arg in "${EXTRA_ARGS[@]}"; do
+    if [[ "${arg}" == "--density-fit" ]]; then
+        OUTPUT_DIR="results/hessians/df"
+        break
+    fi
+done
+OUTPUT_SUFFIX="pyscf"
+if [[ "${OUTPUT_DIR}" == "results/hessians/df" ]]; then
+    OUTPUT_SUFFIX="pyscf_df"
+fi
+OUTPUT_FILE="${3:-${OUTPUT_DIR}/$(basename "${H5_FILE%.h5}")_sample_${SAMPLE_NUMBER}_${OUTPUT_SUFFIX}.h5}"
 
 cd "${SLURM_SUBMIT_DIR}"
 

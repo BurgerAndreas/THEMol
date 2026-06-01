@@ -43,6 +43,43 @@ UMA_PLOT_FACTORS = {
     "force_rms": 1.0,
     "hessian_rms": 1.0,
 }
+METHOD_COLORS = (
+    "#be1420",
+    "#299d8f",
+    # "#669aba",
+    "#e7c66b",
+    # "#8ab07c",
+    "#e66d50",
+    "#012f48",
+    "#8ab07c",
+    # "#297270",
+    "#f3a361",
+    "#7a0101",
+)
+METHOD_MARKERS = ("o", "^", "s", "D", "P", "X", "v")
+UMA_COMPARISON_LABEL = "ωB97M-V/def2-TZVPD vs UMA"
+ORCA_COMPARISON_LABEL = "ωB97M-V/def2-TZVPD vs wB97M-D4/def2-TZVPD"
+METHOD_ORDER = (
+    "ωB97M-V/def2-TZVPD vs GFN2-xTB",
+    "ωB97M-V/def2-TZVPD vs g-xTB",
+    "ωB97M-V/def2-TZVPD vs B3LYP-D3BJ/dzvp",
+    ORCA_COMPARISON_LABEL,
+    UMA_COMPARISON_LABEL,
+    # "ωB97M-V/def2-TZVPD vs w. Dens.Fit.",
+)
+METHOD_STYLE_INDEX = {method: idx for idx, method in enumerate(METHOD_ORDER)}
+
+
+def ordered_comparisons(rows: list[dict[str, float | int | str]]) -> list[str]:
+    present = {str(row["comparison"]) for row in rows}
+    ordered = [comparison for comparison in METHOD_ORDER if comparison in present]
+    ordered.extend(sorted(present - set(METHOD_ORDER)))
+    return ordered
+
+
+def method_style(comparison: str) -> tuple[str, str]:
+    idx = METHOD_STYLE_INDEX.get(comparison, len(METHOD_STYLE_INDEX))
+    return METHOD_MARKERS[idx % len(METHOD_MARKERS)], METHOD_COLORS[idx % len(METHOD_COLORS)]
 
 
 @dataclass(frozen=True)
@@ -69,18 +106,39 @@ class ModeRecord:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Make scalar comparison plots from PySCF, THEMol, UMA, and xTB output HDF5 files."
+        description="Make scalar comparison plots from PySCF, THEMol, UMA, xTB, and ORCA output HDF5 files."
     )
-    parser.add_argument("--no-df-dir", default="results/no_df", help="Directory with no-density-fitting outputs.")
-    parser.add_argument("--df-dir", default="results/df", help="Directory with density-fitting outputs.")
-    parser.add_argument("--uma-dir", default="results/uma", help="Directory with UMA outputs.")
-    parser.add_argument("--xtb-dir", default="results/xtb_gfn2", help="Directory with GFN2-xTB outputs.")
+    parser.add_argument("--no-df-dir", default="results/hessians/no_df", help="Directory with no-density-fitting outputs.")
+    parser.add_argument("--df-dir", default="results/hessians/df", help="Directory with density-fitting outputs.")
+    parser.add_argument("--uma-dir", default="results/hessians/uma", help="Directory with UMA outputs.")
+    parser.add_argument("--xtb-dir", default="results/hessians/xtb_gfn2", help="Directory with GFN2-xTB outputs.")
+    parser.add_argument("--gxtb-dir", default="results/hessians/gxtb", help="Directory with g-xTB outputs.")
+    parser.add_argument(
+        "--orca-dir",
+        default="results/hessians/orca_wb97m_d4_def2_tzvpd",
+        help="Directory with ORCA wB97M-D4/def2-TZVPD outputs.",
+    )
     parser.add_argument("--output-dir", default="plots/pyscf_comparisons", help="Directory for plots and CSV summary.")
     parser.add_argument("--pattern", default="*.h5", help="Glob pattern for result HDF5 files.")
     parser.add_argument(
         "--xtb-pattern",
         default="hessian_0_sample_*_xtb_gfn2.h5",
         help="Glob pattern for GFN2-xTB result HDF5 files.",
+    )
+    parser.add_argument(
+        "--uma-pattern",
+        default="hessian_0_sample_*_uma_s_1p2.h5",
+        help="Glob pattern for UMA result HDF5 files.",
+    )
+    parser.add_argument(
+        "--gxtb-pattern",
+        default="hessian_0_sample_*_gxtb.h5",
+        help="Glob pattern for g-xTB result HDF5 files.",
+    )
+    parser.add_argument(
+        "--orca-pattern",
+        default="hessian_0_sample_*_orca_wb97m_d4_def2_tzvpd.h5",
+        help="Glob pattern for ORCA result HDF5 files.",
     )
     parser.add_argument("--dpi", type=int, default=200, help="PNG resolution.")
     parser.add_argument(
@@ -325,13 +383,13 @@ def scatter_plot(
     ys = [row[3] for row in rows]
 
     fig, ax = plt.subplots(figsize=(6.2, 5.4), constrained_layout=True)
-    points = ax.scatter(xs, ys, c=atoms, s=56, cmap="viridis", edgecolors="black", linewidths=0.5)
+    points = ax.scatter(xs, ys, c=atoms, s=84, cmap="viridis", edgecolors="white", linewidths=0.5)
     add_identity_line(ax, xs, ys)
     cbar = fig.colorbar(points, ax=ax)
     cbar.set_label("Atom count")
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
-    ax.legend(loc="best")
+    ax.legend(loc="best", frameon=True, edgecolor="none")
     ax.grid(True, alpha=0.25)
     output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output, dpi=dpi)
@@ -346,29 +404,49 @@ def metric_by_atoms_plot(
     output: Path,
     dpi: int,
     y_tick_format: str | None = None,
+    y_scale: str = "linear",
+    legend_above: bool = False,
 ) -> None:
     if not rows:
         return
 
     fig, ax = plt.subplots(figsize=(6.4, 5.4), constrained_layout=True)
-    markers = ("o", "^", "s", "D", "P", "X")
-    comparisons = list(dict.fromkeys(str(row["comparison"]) for row in rows))
-    for idx, comparison in enumerate(comparisons):
+    for comparison in ordered_comparisons(rows):
         subset = [row for row in rows if row["comparison"] == comparison]
         if not subset:
             continue
         xs = [float(row["atoms"]) for row in subset]
         ys = [float(row[metric]) for row in subset]
-        ax.scatter(xs, ys, s=58, marker=markers[idx % len(markers)], label=comparison, linewidths=0.5)
+        marker, color = method_style(comparison)
+        ax.scatter(
+            xs,
+            ys,
+            s=87,
+            marker=marker,
+            color=color,
+            label=comparison,
+            edgecolors="white",
+            linewidths=0.5,
+        )
     ax.set_xlabel("Atom count")
     ax.set_ylabel(y_label)
+    ax.set_yscale(y_scale)
+    if y_scale == "log":
+        ax.yaxis.set_minor_locator(mticker.LogLocator(base=10.0, subs=np.arange(2, 10) * 0.1))
+        ax.yaxis.set_minor_formatter(mticker.NullFormatter())
+        ax.tick_params(axis="y", which="minor", length=3)
     if y_tick_format is not None:
         ax.yaxis.set_major_formatter(mticker.StrMethodFormatter(y_tick_format))
     atom_counts = sorted({int(row["atoms"]) for row in rows})
     ax.set_xticks(atom_counts)
     ax.set_xticklabels([str(atom_count) for atom_count in atom_counts])
-    ax.legend(loc="best", edgecolor="none")
+    if legend_above:
+        ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.02), frameon=True, edgecolor="none")
+    else:
+        ax.legend(loc="best", frameon=True, edgecolor="none")
     ax.grid(True, alpha=0.25)
+    if y_scale == "log":
+        ax.grid(True, which="minor", axis="y", alpha=0.28, linewidth=0.35)
     output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output, dpi=dpi)
     plt.close(fig)
@@ -380,9 +458,7 @@ def negative_count_plot(rows: list[dict[str, float | int | str]], output: Path, 
 
     fig, ax = plt.subplots(figsize=(5.8, 5.4), constrained_layout=True)
     all_counts = []
-    markers = ("o", "^", "s", "D", "P", "X")
-    comparisons = list(dict.fromkeys(str(row["comparison"]) for row in rows))
-    for idx, comparison in enumerate(comparisons):
+    for comparison in ordered_comparisons(rows):
         subset = [row for row in rows if row["comparison"] == comparison]
         if not subset:
             continue
@@ -390,13 +466,15 @@ def negative_count_plot(rows: list[dict[str, float | int | str]], output: Path, 
         ys = [int(row["comparison_negative_eigenvalues"]) for row in subset]
         all_counts.extend(xs)
         all_counts.extend(ys)
+        marker, color = method_style(comparison)
         ax.scatter(
             xs,
             ys,
-            s=58,
-            marker=markers[idx % len(markers)],
+            s=87,
+            marker=marker,
+            color=color,
             label=comparison,
-            edgecolors="black",
+            edgecolors="white",
             linewidths=0.5,
         )
     if all_counts:
@@ -407,7 +485,7 @@ def negative_count_plot(rows: list[dict[str, float | int | str]], output: Path, 
         ax.set_ylim(lo - 0.5, hi + 0.5)
     ax.set_xlabel("Baseline negative eigenvalue count")
     ax.set_ylabel("Comparison negative eigenvalue count")
-    ax.legend(loc="best")
+    ax.legend(loc="best", frameon=True, edgecolor="none")
     ax.grid(True, alpha=0.25)
     output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output, dpi=dpi)
@@ -477,6 +555,38 @@ def make_absolute_error_rows(
                 }
             )
     return rows
+
+
+def make_offset_corrected_error_rows(
+    left: dict[int, ResultRecord],
+    right: dict[int, ResultRecord],
+    left_attr: str,
+    right_attr: str,
+    comparison: str,
+    left_factor: float = 1.0,
+    right_factor: float = 1.0,
+) -> list[dict[str, float | int | str]]:
+    paired_values = []
+    for sample in sorted(set(left) & set(right)):
+        left_value = getattr(left[sample], left_attr)
+        right_value = getattr(right[sample], right_attr)
+        if left_value is not None and right_value is not None:
+            left_scaled = float(left_value) * left_factor
+            right_scaled = float(right_value) * right_factor
+            paired_values.append((sample, left[sample].atoms, left_scaled, right_scaled))
+    if not paired_values:
+        return []
+
+    mean_delta = float(np.mean([right_value - left_value for _, _, left_value, right_value in paired_values]))
+    return [
+        {
+            "sample": sample,
+            "atoms": atoms,
+            "comparison": comparison,
+            "absolute_error": abs((right_value - left_value) - mean_delta),
+        }
+        for sample, atoms, left_value, right_value in paired_values
+    ]
 
 
 def hessian_matrix(record: ResultRecord, name: str, factor: float) -> np.ndarray | None:
@@ -555,6 +665,8 @@ def write_summary_csv(
     df: dict[int, ResultRecord],
     uma: dict[int, ResultRecord],
     xtb: dict[int, ResultRecord],
+    gxtb: dict[int, ResultRecord],
+    orca: dict[int, ResultRecord],
 ) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", newline="") as handle:
@@ -567,29 +679,39 @@ def write_summary_csv(
                 "df_energy_hartree",
                 "uma_energy_ev",
                 "xtb_energy_hartree",
-                "themol_energy_kcal_mol",
+                "gxtb_energy_hartree",
+                "orca_energy_hartree",
+                "B3LYPD3BJdzvp_energy_kcal_mol",
                 "no_df_force_rms_hartree_per_bohr",
                 "df_force_rms_hartree_per_bohr",
                 "uma_force_rms_ev_per_angstrom",
                 "xtb_force_rms_hartree_per_bohr",
-                "themol_force_rms_kcal_mol_per_angstrom",
+                "gxtb_force_rms_hartree_per_bohr",
+                "orca_force_rms_hartree_per_bohr",
+                "B3LYPD3BJdzvp_force_rms_kcal_mol_per_angstrom",
                 "no_df_hessian_rms_hartree_per_bohr2",
                 "df_hessian_rms_hartree_per_bohr2",
                 "uma_hessian_rms_ev_per_angstrom2",
                 "xtb_hessian_rms_hartree_per_bohr2",
-                "themol_hessian_rms_kcal_mol_per_angstrom2",
+                "gxtb_hessian_rms_hartree_per_bohr2",
+                "orca_hessian_rms_hartree_per_bohr2",
+                "B3LYPD3BJdzvp_hessian_rms_kcal_mol_per_angstrom2",
                 "no_df_file",
                 "df_file",
                 "uma_file",
                 "xtb_file",
+                "gxtb_file",
+                "orca_file",
             ]
         )
-        for sample in sorted(set(no_df) | set(df) | set(uma) | set(xtb)):
+        for sample in sorted(set(no_df) | set(df) | set(uma) | set(xtb) | set(gxtb) | set(orca)):
             no_df_record = no_df.get(sample)
             df_record = df.get(sample)
             uma_record = uma.get(sample)
             xtb_record = xtb.get(sample)
-            reference = no_df_record or df_record or uma_record or xtb_record
+            gxtb_record = gxtb.get(sample)
+            orca_record = orca.get(sample)
+            reference = no_df_record or df_record or uma_record or xtb_record or gxtb_record or orca_record
             writer.writerow(
                 [
                     sample,
@@ -598,21 +720,29 @@ def write_summary_csv(
                     df_record.energy if df_record else "",
                     uma_record.energy if uma_record else "",
                     xtb_record.energy if xtb_record else "",
+                    gxtb_record.energy if gxtb_record else "",
+                    orca_record.energy if orca_record else "",
                     reference.reference_energy if reference else "",
                     no_df_record.force_rms if no_df_record else "",
                     df_record.force_rms if df_record else "",
                     uma_record.force_rms if uma_record else "",
                     xtb_record.force_rms if xtb_record else "",
+                    gxtb_record.force_rms if gxtb_record else "",
+                    orca_record.force_rms if orca_record else "",
                     reference.reference_force_rms if reference else "",
                     no_df_record.hessian_rms if no_df_record else "",
                     df_record.hessian_rms if df_record else "",
                     uma_record.hessian_rms if uma_record else "",
                     xtb_record.hessian_rms if xtb_record else "",
+                    gxtb_record.hessian_rms if gxtb_record else "",
+                    orca_record.hessian_rms if orca_record else "",
                     reference.reference_hessian_rms if reference else "",
                     no_df_record.path if no_df_record else "",
                     df_record.path if df_record else "",
                     uma_record.path if uma_record else "",
                     xtb_record.path if xtb_record else "",
+                    gxtb_record.path if gxtb_record else "",
+                    orca_record.path if orca_record else "",
                 ]
             )
 
@@ -652,18 +782,58 @@ def write_eckart_summary_csv(output: Path, rows: list[dict[str, float | int | st
             )
 
 
+def print_method_summary_table(
+    hessian_rows: list[dict[str, float | int | str]],
+    eckart_rows: list[dict[str, float | int | str]],
+) -> None:
+    if not hessian_rows and not eckart_rows:
+        return
+
+    comparison_rows = hessian_rows + eckart_rows
+    method_width = max(38, *(len(comparison) for comparison in ordered_comparisons(comparison_rows)))
+    hessian_width = len("H MAE (eV/A^2)")
+    eigenvalue_width = len("EigVal MAE")
+    cosine_width = len("|cos v1|")
+    count_width = len("n")
+    print("\n")
+    header = (
+        f"{'Method':<{method_width}} {'H MAE (eV/A^2)':>{hessian_width}} "
+        f"{'EigVal MAE':>{eigenvalue_width}} {'|cos v1|':>{cosine_width}} {'n':>{count_width}}"
+    )
+    print(header)
+    print("-" * len(header))
+    for comparison in ordered_comparisons(comparison_rows):
+        hessian_values = [float(row["hessian_mae"]) for row in hessian_rows if row["comparison"] == comparison]
+        eigenvalue_values = [float(row["eigenvalue_mae"]) for row in eckart_rows if row["comparison"] == comparison]
+        cosine_values = [
+            float(row["first_eigenvector_abs_cosine"]) for row in eckart_rows if row["comparison"] == comparison
+        ]
+        sample_count = max(len(hessian_values), len(eigenvalue_values), len(cosine_values))
+        hessian_text = f"{float(np.mean(hessian_values)):.3f}" if hessian_values else "--"
+        eigenvalue_text = f"{float(np.mean(eigenvalue_values)):.3f}" if eigenvalue_values else "--"
+        cosine_text = f"{float(np.mean(cosine_values)):.3f}" if cosine_values else "--"
+        print(
+            f"{comparison:<{method_width}} {hessian_text:>{hessian_width}} "
+            f"{eigenvalue_text:>{eigenvalue_width}} {cosine_text:>{cosine_width}} {sample_count:>{count_width}}"
+        )
+
+
 def main() -> None:
     args = parse_args()
     no_df_dir = Path(args.no_df_dir)
     df_dir = Path(args.df_dir)
     uma_dir = Path(args.uma_dir)
     xtb_dir = Path(args.xtb_dir)
+    gxtb_dir = Path(args.gxtb_dir)
+    orca_dir = Path(args.orca_dir)
     output_dir = Path(args.output_dir)
 
     no_df = read_records(no_df_dir, args.pattern)
     df = read_records(df_dir, args.pattern)
-    uma = read_records(uma_dir, args.pattern)
+    uma = read_records(uma_dir, args.uma_pattern)
     xtb = read_records(xtb_dir, args.xtb_pattern)
+    gxtb = read_records(gxtb_dir, args.gxtb_pattern)
+    orca = read_records(orca_dir, args.orca_pattern)
     if not no_df:
         raise SystemExit(f"No no-DF result files found in {no_df_dir}")
     if not df:
@@ -692,7 +862,7 @@ def main() -> None:
     )
     uma_modes = read_mode_records(
         uma_dir,
-        args.pattern,
+        args.uma_pattern,
         hessian_name="hessian",
         hessian_factor=UMA_PLOT_FACTORS["hessian_rms"],
         rot_thresh=args.rot_thresh,
@@ -700,6 +870,20 @@ def main() -> None:
     xtb_modes = read_mode_records(
         xtb_dir,
         args.xtb_pattern,
+        hessian_name="hessian",
+        hessian_factor=PYSCF_PLOT_FACTORS["hessian_rms"],
+        rot_thresh=args.rot_thresh,
+    )
+    gxtb_modes = read_mode_records(
+        gxtb_dir,
+        args.gxtb_pattern,
+        hessian_name="hessian",
+        hessian_factor=PYSCF_PLOT_FACTORS["hessian_rms"],
+        rot_thresh=args.rot_thresh,
+    )
+    orca_modes = read_mode_records(
+        orca_dir,
+        args.orca_pattern,
         hessian_name="hessian",
         hessian_factor=PYSCF_PLOT_FACTORS["hessian_rms"],
         rot_thresh=args.rot_thresh,
@@ -716,7 +900,7 @@ def main() -> None:
             "No-DF energy (eV)",
             "THEMol energy (eV)",
             "THEMol vs No-DF Energy",
-            output_dir / "themol_vs_no_df_energy.png",
+            output_dir / "B3LYPD3BJdzvp_vs_wB97MVdef2TZVPD_energy.png",
         ),
         (
             make_reference_rows(
@@ -729,7 +913,7 @@ def main() -> None:
             "No-DF force RMS (eV/A)",
             "THEMol force RMS (eV/A)",
             "THEMol vs No-DF Force RMS",
-            output_dir / "themol_vs_no_df_force_rms.png",
+            output_dir / "B3LYPD3BJdzvp_vs_wB97MVdef2TZVPD_force_rms.png",
         ),
         (
             make_reference_rows(
@@ -742,7 +926,35 @@ def main() -> None:
             "No-DF Hessian RMS (eV/A^2)",
             "THEMol Hessian RMS (eV/A^2)",
             "THEMol vs No-DF Hessian RMS",
-            output_dir / "themol_vs_no_df_hessian_rms.png",
+            output_dir / "B3LYPD3BJdzvp_vs_wB97MVdef2TZVPD_hessian_rms.png",
+        ),
+        (
+            make_pair_rows(
+                no_df,
+                uma,
+                "energy",
+                "energy",
+                PYSCF_PLOT_FACTORS["energy"],
+                UMA_PLOT_FACTORS["energy"],
+            ),
+            "No-DF energy (eV)",
+            "UMA energy (eV)",
+            "UMA vs No-DF Energy",
+            output_dir / "uma_vs_wB97MVdef2TZVPD_energy.png",
+        ),
+        (
+            make_pair_rows(
+                no_df,
+                uma,
+                "force_rms",
+                "force_rms",
+                PYSCF_PLOT_FACTORS["force_rms"],
+                UMA_PLOT_FACTORS["force_rms"],
+            ),
+            "No-DF force RMS (eV/A)",
+            "UMA force RMS (eV/A)",
+            "UMA vs No-DF Force RMS",
+            output_dir / "uma_vs_wB97MVdef2TZVPD_force_rms.png",
         ),
         (
             make_pair_rows(
@@ -756,7 +968,7 @@ def main() -> None:
             "No-DF Hessian RMS (eV/A^2)",
             "UMA Hessian RMS (eV/A^2)",
             "UMA vs No-DF Hessian RMS",
-            output_dir / "uma_vs_no_df_hessian_rms.png",
+            output_dir / "uma_vs_wB97MVdef2TZVPD_hessian_rms.png",
         ),
         (
             make_pair_rows(
@@ -770,7 +982,35 @@ def main() -> None:
             "ωB97M-V/def2-TZVPD Hessian RMS (eV/A^2)",
             "GFN2-xTB Hessian RMS (eV/A^2)",
             "ωB97M-V/def2-TZVPD vs GFN2-xTB Hessian RMS",
-            output_dir / "xtb_gfn2_vs_no_df_hessian_rms.png",
+            output_dir / "xtb_gfn2_vs_wB97MVdef2TZVPD_hessian_rms.png",
+        ),
+        (
+            make_pair_rows(
+                no_df,
+                gxtb,
+                "hessian_rms",
+                "hessian_rms",
+                PYSCF_PLOT_FACTORS["hessian_rms"],
+                PYSCF_PLOT_FACTORS["hessian_rms"],
+            ),
+            "ωB97M-V/def2-TZVPD Hessian RMS (eV/A^2)",
+            "g-xTB Hessian RMS (eV/A^2)",
+            "ωB97M-V/def2-TZVPD vs g-xTB Hessian RMS",
+            output_dir / "gxtb_vs_wB97MVdef2TZVPD_hessian_rms.png",
+        ),
+        (
+            make_pair_rows(
+                no_df,
+                orca,
+                "hessian_rms",
+                "hessian_rms",
+                PYSCF_PLOT_FACTORS["hessian_rms"],
+                PYSCF_PLOT_FACTORS["hessian_rms"],
+            ),
+            "ωB97M-V/def2-TZVPD Hessian RMS (eV/A^2)",
+            "ORCA wB97M-D4/def2-TZVPD Hessian RMS (eV/A^2)",
+            "ωB97M-V/def2-TZVPD vs ORCA wB97M-D4/def2-TZVPD Hessian RMS",
+            output_dir / "orca_vs_wB97MVdef2TZVPD_hessian_rms.png",
         ),
     ]
 
@@ -783,64 +1023,119 @@ def main() -> None:
         else:
             skipped.append(output.name)
 
-    df_error_plot_specs = [
-        ("energy", "Energy MAE (eV)", "Energy MAE", output_dir / "df_vs_no_df_energy.png", "{x:.1e}"),
+    scalar_comparison_methods = [
+        # ("ωB97M-V/def2-TZVPD vs w. Dens.Fit.", df, PYSCF_PLOT_FACTORS),
+        (UMA_COMPARISON_LABEL, uma, UMA_PLOT_FACTORS),
+        ("ωB97M-V/def2-TZVPD vs GFN2-xTB", xtb, PYSCF_PLOT_FACTORS),
+        ("ωB97M-V/def2-TZVPD vs g-xTB", gxtb, PYSCF_PLOT_FACTORS),
+        (ORCA_COMPARISON_LABEL, orca, PYSCF_PLOT_FACTORS),
+    ]
+    error_plot_specs = [
+        (
+            "energy",
+            "Energy MAE after mean offset removal (eV)",
+            "Offset-Corrected Energy MAE",
+            output_dir / "energy_mae_by_atoms.png",
+            None,
+            "linear",
+            False,
+        ),
         (
             "force_rms",
             "Force RMS MAE (eV/A)",
             "Force RMS MAE",
-            output_dir / "df_vs_no_df_force_rms.png",
+            output_dir / "force_rms_mae_by_atoms.png",
             None,
+            "linear",
+            False,
         ),
     ]
-    for metric, y_label, title, output, y_tick_format in df_error_plot_specs:
-        rows = make_absolute_error_rows(
-            no_df,
-            df,
-            metric,
-            metric,
-            "ωB97M-V/def2-TZVPD w/wo Dens.Fit",
-            PYSCF_PLOT_FACTORS[metric],
-            PYSCF_PLOT_FACTORS[metric],
-        )
+    for metric, y_label, title, output, y_tick_format, y_scale, legend_above in error_plot_specs:
+        rows = []
+        for comparison, records, factors in scalar_comparison_methods:
+            row_factory = make_offset_corrected_error_rows if metric == "energy" else make_absolute_error_rows
+            rows.extend(
+                row_factory(
+                    no_df,
+                    records,
+                    metric,
+                    metric,
+                    comparison,
+                    PYSCF_PLOT_FACTORS[metric],
+                    factors[metric],
+                )
+            )
         if rows:
-            metric_by_atoms_plot(rows, "absolute_error", y_label, title, output, args.dpi, y_tick_format)
+            metric_by_atoms_plot(
+                rows,
+                "absolute_error",
+                y_label,
+                title,
+                output,
+                args.dpi,
+                y_tick_format,
+                y_scale,
+                legend_above,
+            )
             written.append((output, len(rows)))
         else:
             skipped.append(output.name)
 
-    hessian_mae_by_atoms_rows = hessian_mae_rows(
-        no_df,
-        df,
-        "ωB97M-V/def2-TZVPD w/wo Dens.Fit",
-        "hessian",
-        "hessian",
-        PYSCF_PLOT_FACTORS["hessian_rms"],
-        PYSCF_PLOT_FACTORS["hessian_rms"],
-    ) + hessian_mae_rows(
-        no_df,
-        no_df,
-        "ωB97M-V/def2-TZVPD vs B3LYP-D3BJ/dzvp",
-        "hessian",
-        "reference_hessian",
-        PYSCF_PLOT_FACTORS["hessian_rms"],
-        THEMOL_PLOT_FACTORS["hessian_rms"],
-    ) + hessian_mae_rows(
-        no_df,
-        uma,
-        "UMA vs ωB97M-V/def2-TZVPD no-DF",
-        "hessian",
-        "hessian",
-        PYSCF_PLOT_FACTORS["hessian_rms"],
-        UMA_PLOT_FACTORS["hessian_rms"],
-    ) + hessian_mae_rows(
-        no_df,
-        xtb,
-        "ωB97M-V/def2-TZVPD vs GFN2-xTB",
-        "hessian",
-        "hessian",
-        PYSCF_PLOT_FACTORS["hessian_rms"],
-        PYSCF_PLOT_FACTORS["hessian_rms"],
+    hessian_mae_by_atoms_rows = (
+        # hessian_mae_rows(
+        #     no_df,
+        #     df,
+        #     "ωB97M-V/def2-TZVPD vs w. Dens.Fit.",
+        #     "hessian",
+        #     "hessian",
+        #     PYSCF_PLOT_FACTORS["hessian_rms"],
+        #     PYSCF_PLOT_FACTORS["hessian_rms"],
+        # )
+        hessian_mae_rows(
+            no_df,
+            no_df,
+            "ωB97M-V/def2-TZVPD vs B3LYP-D3BJ/dzvp",
+            "hessian",
+            "reference_hessian",
+            PYSCF_PLOT_FACTORS["hessian_rms"],
+            THEMOL_PLOT_FACTORS["hessian_rms"],
+        )
+        + hessian_mae_rows(
+            no_df,
+            uma,
+            UMA_COMPARISON_LABEL,
+            "hessian",
+            "hessian",
+            PYSCF_PLOT_FACTORS["hessian_rms"],
+            UMA_PLOT_FACTORS["hessian_rms"],
+        )
+        + hessian_mae_rows(
+            no_df,
+            xtb,
+            "ωB97M-V/def2-TZVPD vs GFN2-xTB",
+            "hessian",
+            "hessian",
+            PYSCF_PLOT_FACTORS["hessian_rms"],
+            PYSCF_PLOT_FACTORS["hessian_rms"],
+        )
+        + hessian_mae_rows(
+            no_df,
+            gxtb,
+            "ωB97M-V/def2-TZVPD vs g-xTB",
+            "hessian",
+            "hessian",
+            PYSCF_PLOT_FACTORS["hessian_rms"],
+            PYSCF_PLOT_FACTORS["hessian_rms"],
+        )
+        + hessian_mae_rows(
+            no_df,
+            orca,
+            ORCA_COMPARISON_LABEL,
+            "hessian",
+            "hessian",
+            PYSCF_PLOT_FACTORS["hessian_rms"],
+            PYSCF_PLOT_FACTORS["hessian_rms"],
+        )
     )
     if hessian_mae_by_atoms_rows:
         metric_by_atoms_plot(
@@ -856,10 +1151,17 @@ def main() -> None:
         skipped.append("hessian_mae_by_atoms.png")
 
     eckart_rows = (
-        eckart_summary_rows(no_df_modes, df_modes, "ωB97M-V/def2-TZVPD w/wo Dens.Fit", args.negative_eigval_threshold)
-        + eckart_summary_rows(no_df_modes, themol_modes, "ωB97M-V/def2-TZVPD vs B3LYP-D3BJ/dzvp", args.negative_eigval_threshold)
-        + eckart_summary_rows(no_df_modes, uma_modes, "UMA vs ωB97M-V/def2-TZVPD no-DF", args.negative_eigval_threshold)
+        # eckart_summary_rows(no_df_modes, df_modes, "ωB97M-V/def2-TZVPD vs w. Dens.Fit.", args.negative_eigval_threshold)
+        eckart_summary_rows(no_df_modes, themol_modes, "ωB97M-V/def2-TZVPD vs B3LYP-D3BJ/dzvp", args.negative_eigval_threshold)
+        + eckart_summary_rows(no_df_modes, uma_modes, UMA_COMPARISON_LABEL, args.negative_eigval_threshold)
         + eckart_summary_rows(no_df_modes, xtb_modes, "ωB97M-V/def2-TZVPD vs GFN2-xTB", args.negative_eigval_threshold)
+        + eckart_summary_rows(no_df_modes, gxtb_modes, "ωB97M-V/def2-TZVPD vs g-xTB", args.negative_eigval_threshold)
+        + eckart_summary_rows(
+            no_df_modes,
+            orca_modes,
+            ORCA_COMPARISON_LABEL,
+            args.negative_eigval_threshold,
+        )
     )
     eckart_plot_specs = [
         (
@@ -888,17 +1190,21 @@ def main() -> None:
         skipped.append("eckart_negative_eigenvalue_counts.png")
 
     summary_path = output_dir / "pyscf_comparison_metrics.csv"
-    write_summary_csv(summary_path, no_df, df, uma, xtb)
+    write_summary_csv(summary_path, no_df, df, uma, xtb, gxtb, orca)
     eckart_summary_path = output_dir / "pyscf_eckart_summary_metrics.csv"
     write_eckart_summary_csv(eckart_summary_path, eckart_rows)
 
-    print(f"Read {len(no_df)} no-DF files, {len(df)} DF files, {len(uma)} UMA files, and {len(xtb)} GFN2-xTB files.")
+    print(
+        f"Read {len(no_df)} no-DF files, {len(df)} DF files, {len(uma)} UMA files, "
+        f"{len(xtb)} GFN2-xTB files, {len(gxtb)} g-xTB files, and {len(orca)} ORCA files."
+    )
     for output, count in written:
-        print(f"Wrote {output} ({count} points)")
+        print(f"Wrote\n {output} ({count} points)")
     for name in skipped:
         print(f"Skipped {name}: no paired data available")
-    print(f"Wrote {summary_path}")
-    print(f"Wrote {eckart_summary_path}")
+    print(f"Wrote\n {summary_path}")
+    print(f"Wrote\n {eckart_summary_path}")
+    print_method_summary_table(hessian_mae_by_atoms_rows, eckart_rows)
 
 
 if __name__ == "__main__":

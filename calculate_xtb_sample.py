@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "-o",
         "--output",
-        help="Output HDF5 path. Defaults to xtb_<input-stem>_sample_<index>.h5.",
+        help="Output HDF5 path. Defaults to results/hessians/<method>/<input-stem>_sample_<index>_<method>.h5.",
     )
     parser.add_argument("--one-based", action="store_true", help="Interpret sample_number as one-based.")
     parser.add_argument("--gfn", type=int, default=2, choices=[0, 1, 2], help="xTB GFN method.")
@@ -342,7 +342,11 @@ def main() -> None:
     if args.charge is not None or args.spin is not None:
         source = "command_line_override"
 
-    output = Path(args.output) if args.output else Path(f"xtb_{h5_file.stem}_sample_{sample['sample_index']}.h5")
+    if args.output:
+        output = Path(args.output)
+    else:
+        method = "gxtb" if args.gxtb else f"xtb_gfn{args.gfn}"
+        output = Path("results/hessians") / method / f"{h5_file.stem}_sample_{sample['sample_index']}_{method}.h5"
     work_dir = (
         Path(args.work_dir)
         if args.work_dir
