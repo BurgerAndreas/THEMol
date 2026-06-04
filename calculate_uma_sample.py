@@ -64,6 +64,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Use FAIRChem's lower-memory Hessian loop instead of vmap.",
     )
+    parser.add_argument(
+        "--cpu-on-oom",
+        action="store_true",
+        help="If CUDA runs out of memory, switch to CPU for the failed and remaining samples.",
+    )
     parser.add_argument("--overwrite", action="store_true", help="Overwrite an existing output HDF5 file.")
     parser.add_argument(
         "--dry-run",
@@ -145,6 +150,9 @@ def build_predictor(args: argparse.Namespace):
     from fairchem.core.calculate import pretrained_mlip
     from fairchem.core.units.mlip_unit import InferenceSettings
 
+    if args.hessian_loop:
+        install_detached_hessian_loop()
+
     settings = InferenceSettings(
         predict_untrained_forces={args.task_name},
         predict_untrained_hessian={args.task_name},
@@ -156,7 +164,72 @@ def build_predictor(args: argparse.Namespace):
     }
     if args.seed is not None:
         kwargs["seed"] = args.seed
-    return pretrained_mlip.get_predict_unit(args.model, **kwargs)
+    predictor = pretrained_mlip.get_predict_unit(args.model, **kwargs)
+    if args.hessian_loop:
+        force_hessian_loop_mode(predictor)
+    return predictor
+
+
+def install_detached_hessian_loop() -> None:
+    """Install a local Hessian loop that detaches each row before storing it."""
+    import torch
+    from fairchem.core.models.uma import outputs
+
+    def compute_hessian_loop_detached(
+        forces_flat: torch.Tensor,
+        pos: torch.Tensor,
+        create_graph: bool,
+    ) -> torch.Tensor:
+        n_forces = len(forces_flat)
+        hessian = torch.zeros(
+            (n_forces, n_forces),
+            device=forces_flat.device,
+            dtype=forces_flat.dtype,
+            requires_grad=False,
+        )
+
+        for i in range(n_forces):
+            hessian[:, i] = torch.autograd.grad(
+                -forces_flat[i],
+                pos,
+                retain_graph=i < n_forces - 1,
+                create_graph=create_graph,
+            )[0].flatten().detach()
+
+        return hessian
+
+    outputs.compute_hessian_loop = compute_hessian_loop_detached
+
+
+def force_hessian_loop_mode(predictor: Any) -> None:
+    """FAIRChem does not propagate hessian_vmap=False to added Hessian heads."""
+    model = getattr(predictor, "model", None)
+    module = getattr(model, "module", model)
+    output_heads = getattr(module, "output_heads", {})
+    for head in output_heads.values():
+        # Some UMA heads wrap the actual Hessian head in a `.head` attribute.
+        for target in (head, getattr(head, "head", None)):
+            regress_config = getattr(target, "regress_config", None)
+            if regress_config is not None and hasattr(regress_config, "hessian_vmap"):
+                regress_config.hessian_vmap = False
+
+
+def is_cuda_oom(exc: BaseException) -> bool:
+    return exc.__class__.__name__ == "OutOfMemoryError" and "CUDA out of memory" in str(exc)
+
+
+def clear_cuda_memory() -> None:
+    import gc
+
+    gc.collect()
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
+    except Exception as exc:  # noqa: BLE001 - best-effort cleanup before CPU fallback.
+        log(f"WARNING: CUDA memory cleanup failed: {exc}")
 
 
 def calculate_uma(
@@ -329,9 +402,11 @@ def main() -> None:
         log("Dry run requested; stopping before UMA model load.")
         return
 
+    active_args = args
+
     log("Loading UMA predictor...")
     load_start = perf_counter()
-    predictor = build_predictor(args)
+    predictor = build_predictor(active_args)
     log(f"Loaded UMA predictor in {perf_counter() - load_start:.1f} s")
 
     total_start = perf_counter()
@@ -346,15 +421,37 @@ def main() -> None:
         log(f"Charge/spin multiplicity: {charge}/{spin_multiplicity} ({source})")
         log(f"Output: {output}")
 
-        energy, forces, hessian = calculate_uma(sample, args, charge, spin_multiplicity, predictor)
+        calc_args = active_args
+        try:
+            energy, forces, hessian = calculate_uma(sample, calc_args, charge, spin_multiplicity, predictor)
+        except Exception as exc:
+            if not (
+                args.cpu_on_oom
+                and str(active_args.device).startswith("cuda")
+                and is_cuda_oom(exc)
+            ):
+                raise
+
+            log("CUDA OOM during UMA Hessian calculation; switching to CPU for this and remaining samples.")
+            predictor = None
+            clear_cuda_memory()
+            active_args = argparse.Namespace(**vars(args))
+            active_args.device = "cpu"
+            cpu_load_start = perf_counter()
+            predictor = build_predictor(active_args)
+            log(f"Loaded CPU UMA predictor in {perf_counter() - cpu_load_start:.1f} s")
+            calc_args = active_args
+            energy, forces, hessian = calculate_uma(sample, calc_args, charge, spin_multiplicity, predictor)
         log(f"[{index}/{len(samples)}] UMA calculation finished in {perf_counter() - sample_start:.1f} s; writing HDF5")
-        write_results(output, sample, args, charge, spin_difference, spin_multiplicity, source, energy, forces, hessian)
+        write_results(output, sample, calc_args, charge, spin_difference, spin_multiplicity, source, energy, forces, hessian)
 
         log(f"Energy (eV): {energy:.16f}")
         log(f"Force shape: {forces.shape}")
         log(f"Gradient shape: {forces.shape}")
         log(f"Hessian shape: {hessian.shape}")
         log(f"[{index}/{len(samples)}] Wrote {output} in {perf_counter() - sample_start:.1f} s")
+        del energy, forces, hessian
+        clear_cuda_memory()
     log(f"Finished {len(samples)} samples in {perf_counter() - total_start:.1f} s")
 
 

@@ -22,7 +22,7 @@ from pyscf.data.elements import MASSES
 sns.set_theme(context="poster", style="whitegrid", font_scale=0.6)
 plt.rcParams["axes.linewidth"] *= 0.2
 plt.rcParams["grid.linewidth"] *= 0.5
-plt.rcParams["legend.fontsize"] *= 0.7
+plt.rcParams["legend.fontsize"] *= 0.6
 
 BOHR2ANG = 0.529177210903
 ANG2BOHR = 1.0 / BOHR2ANG
@@ -56,25 +56,52 @@ METHOD_COLORS = (
     "#f3a361",
     "#7a0101",
 )
-METHOD_MARKERS = ("o", "^", "s", "D", "P", "X", "v")
-UMA_COMPARISON_LABEL = "ωB97M-V/def2-TZVPD vs UMA"
-ORCA_COMPARISON_LABEL = "ωB97M-V/def2-TZVPD vs wB97M-D4/def2-TZVPD"
+METHOD_MARKERS = ("o", "^", "D", "*", "P", "X", "v")
+GROUND_TRUTH_LABEL = "ωB97M-D4/def2-QZVPPD"
+PYSCF_REFERENCE_LABEL = "ωB97M-V/def2-TZVPD"
+THEMOL_LABEL = "B3LYP-D3BJ/dzvp"
+XTB_COMPARISON_LABEL = f"{GROUND_TRUTH_LABEL} vs GFN2-xTB"
+GXTB_COMPARISON_LABEL = f"{GROUND_TRUTH_LABEL} vs g-xTB"
+THEMOL_COMPARISON_LABEL = f"{GROUND_TRUTH_LABEL} vs {THEMOL_LABEL}"
+ORCA_COMPARISON_LABEL = f"{GROUND_TRUTH_LABEL} vs ωB97M-D4/def2-TZVPD"
+PYSCF_COMPARISON_LABEL = f"{GROUND_TRUTH_LABEL} vs {PYSCF_REFERENCE_LABEL}"
+UMA_COMPARISON_LABEL = f"{GROUND_TRUTH_LABEL} vs UMA"
 METHOD_ORDER = (
-    "ωB97M-V/def2-TZVPD vs GFN2-xTB",
-    "ωB97M-V/def2-TZVPD vs g-xTB",
-    "ωB97M-V/def2-TZVPD vs B3LYP-D3BJ/dzvp",
+    XTB_COMPARISON_LABEL,
+    GXTB_COMPARISON_LABEL,
+    THEMOL_COMPARISON_LABEL,
     ORCA_COMPARISON_LABEL,
+    PYSCF_COMPARISON_LABEL,
     UMA_COMPARISON_LABEL,
-    # "ωB97M-V/def2-TZVPD vs w. Dens.Fit.",
+    # f"{GROUND_TRUTH_LABEL} vs w. Dens.Fit.",
 )
 METHOD_STYLE_INDEX = {method: idx for idx, method in enumerate(METHOD_ORDER)}
 
 
-def ordered_comparisons(rows: list[dict[str, float | int | str]]) -> list[str]:
+def ordered_comparisons(
+    rows: list[dict[str, float | int | str]],
+    comparison_order: list[str] | None = None,
+) -> list[str]:
     present = {str(row["comparison"]) for row in rows}
-    ordered = [comparison for comparison in METHOD_ORDER if comparison in present]
-    ordered.extend(sorted(present - set(METHOD_ORDER)))
+    base_order = comparison_order if comparison_order is not None else list(METHOD_ORDER)
+    ordered = [comparison for comparison in base_order if comparison in present]
+    ordered.extend(sorted(present - set(base_order)))
     return ordered
+
+
+def ordered_comparisons_by_mean_metric(
+    rows: list[dict[str, float | int | str]],
+    metric: str,
+) -> list[str]:
+    comparisons = ordered_comparisons(rows)
+    return sorted(
+        comparisons,
+        key=lambda comparison: (
+            float(np.mean([float(row[metric]) for row in rows if row["comparison"] == comparison])),
+            METHOD_STYLE_INDEX.get(comparison, len(METHOD_STYLE_INDEX)),
+            comparison,
+        ),
+    )
 
 
 def method_style(comparison: str) -> tuple[str, str]:
@@ -114,6 +141,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--xtb-dir", default="results/hessians/xtb_gfn2", help="Directory with GFN2-xTB outputs.")
     parser.add_argument("--gxtb-dir", default="results/hessians/gxtb", help="Directory with g-xTB outputs.")
     parser.add_argument(
+        "--ground-truth-dir",
+        default="results/hessians/orca_wb97m_d4_def2_qzvppd",
+        help="Directory with ORCA wB97M-D4/def2-QZVPPD ground-truth outputs.",
+    )
+    parser.add_argument(
         "--orca-dir",
         default="results/hessians/orca_wb97m_d4_def2_tzvpd",
         help="Directory with ORCA wB97M-D4/def2-TZVPD outputs.",
@@ -139,6 +171,11 @@ def parse_args() -> argparse.Namespace:
         "--orca-pattern",
         default="hessian_0_sample_*_orca_wb97m_d4_def2_tzvpd.h5",
         help="Glob pattern for ORCA result HDF5 files.",
+    )
+    parser.add_argument(
+        "--ground-truth-pattern",
+        default="hessian_0_sample_*_orca_wb97m_d4_def2_qzvppd.h5",
+        help="Glob pattern for ORCA ground-truth result HDF5 files.",
     )
     parser.add_argument("--dpi", type=int, default=200, help="PNG resolution.")
     parser.add_argument(
@@ -367,6 +404,10 @@ def add_identity_line(ax, xs: list[float], ys: list[float]) -> None:
     ax.set_ylim(lo, hi)
 
 
+def add_legend_above(ax) -> None:
+    ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.02), frameon=True, edgecolor="none")
+
+
 def scatter_plot(
     rows: list[tuple[int, int, float, float]],
     x_label: str,
@@ -382,17 +423,18 @@ def scatter_plot(
     xs = [row[2] for row in rows]
     ys = [row[3] for row in rows]
 
-    fig, ax = plt.subplots(figsize=(6.2, 5.4), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(6.2, 5.9))
     points = ax.scatter(xs, ys, c=atoms, s=84, cmap="viridis", edgecolors="white", linewidths=0.5)
     add_identity_line(ax, xs, ys)
     cbar = fig.colorbar(points, ax=ax)
     cbar.set_label("Atom count")
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
-    ax.legend(loc="best", frameon=True, edgecolor="none")
+    add_legend_above(ax)
     ax.grid(True, alpha=0.25)
     output.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output, dpi=dpi)
+    fig.tight_layout(pad=0.01)
+    fig.savefig(output, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -405,18 +447,23 @@ def metric_by_atoms_plot(
     dpi: int,
     y_tick_format: str | None = None,
     y_scale: str = "linear",
-    legend_above: bool = False,
+    comparison_order: list[str] | None = None,
+    y_clip: tuple[float, float] | None = None,
 ) -> None:
     if not rows:
         return
 
-    fig, ax = plt.subplots(figsize=(6.4, 5.4), constrained_layout=True)
-    for comparison in ordered_comparisons(rows):
+    fig, ax = plt.subplots(figsize=(6.4, 6.0))
+    for comparison in ordered_comparisons(rows, comparison_order):
         subset = [row for row in rows if row["comparison"] == comparison]
+        if y_scale == "log":
+            subset = [row for row in subset if float(row[metric]) > 0]
         if not subset:
             continue
         xs = [float(row["atoms"]) for row in subset]
         ys = [float(row[metric]) for row in subset]
+        if y_clip is not None:
+            ys = [float(np.clip(y, y_clip[0], y_clip[1])) for y in ys]
         marker, color = method_style(comparison)
         ax.scatter(
             xs,
@@ -440,29 +487,32 @@ def metric_by_atoms_plot(
     atom_counts = sorted({int(row["atoms"]) for row in rows})
     ax.set_xticks(atom_counts)
     ax.set_xticklabels([str(atom_count) for atom_count in atom_counts])
-    if legend_above:
-        ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.02), frameon=True, edgecolor="none")
-    else:
-        ax.legend(loc="best", frameon=True, edgecolor="none")
+    add_legend_above(ax)
     ax.grid(True, alpha=0.25)
     if y_scale == "log":
         ax.grid(True, which="minor", axis="y", alpha=0.28, linewidth=0.35)
     output.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output, dpi=dpi)
+    fig.tight_layout(pad=0.01)
+    fig.savefig(output, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
 
 
-def negative_count_plot(rows: list[dict[str, float | int | str]], output: Path, dpi: int) -> None:
+def negative_count_plot(
+    rows: list[dict[str, float | int | str]],
+    output: Path,
+    dpi: int,
+    comparison_order: list[str] | None = None,
+) -> None:
     if not rows:
         return
 
-    fig, ax = plt.subplots(figsize=(5.8, 5.4), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(5.8, 5.9))
     all_counts = []
-    for comparison in ordered_comparisons(rows):
+    for comparison in ordered_comparisons(rows, comparison_order):
         subset = [row for row in rows if row["comparison"] == comparison]
         if not subset:
             continue
-        xs = [int(row["no_df_negative_eigenvalues"]) for row in subset]
+        xs = [int(row["baseline_negative_eigenvalues"]) for row in subset]
         ys = [int(row["comparison_negative_eigenvalues"]) for row in subset]
         all_counts.extend(xs)
         all_counts.extend(ys)
@@ -483,12 +533,13 @@ def negative_count_plot(rows: list[dict[str, float | int | str]], output: Path, 
         ax.plot([lo, hi], [lo, hi], linestyle="--", linewidth=1, color="0.35", label="same count")
         ax.set_xlim(lo - 0.5, hi + 0.5)
         ax.set_ylim(lo - 0.5, hi + 0.5)
-    ax.set_xlabel("Baseline negative eigenvalue count")
+    ax.set_xlabel("Ground-truth negative eigenvalue count")
     ax.set_ylabel("Comparison negative eigenvalue count")
-    ax.legend(loc="best", frameon=True, edgecolor="none")
+    add_legend_above(ax)
     ax.grid(True, alpha=0.25)
     output.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(output, dpi=dpi)
+    fig.tight_layout(pad=0.01)
+    fig.savefig(output, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -624,33 +675,33 @@ def hessian_mae_rows(
 
 
 def eckart_summary_rows(
-    no_df_modes: dict[int, ModeRecord],
+    baseline_modes: dict[int, ModeRecord],
     comparison_modes: dict[int, ModeRecord],
     comparison_label: str,
     negative_threshold: float,
 ) -> list[dict[str, float | int | str]]:
     rows: list[dict[str, float | int | str]] = []
-    for sample in sorted(set(no_df_modes) & set(comparison_modes)):
-        no_df_record = no_df_modes[sample]
+    for sample in sorted(set(baseline_modes) & set(comparison_modes)):
+        baseline_record = baseline_modes[sample]
         comparison_record = comparison_modes[sample]
-        mode_count = min(no_df_record.eigvals.size, comparison_record.eigvals.size)
+        mode_count = min(baseline_record.eigvals.size, comparison_record.eigvals.size)
         if mode_count == 0:
             continue
-        no_df_eigvals = no_df_record.eigvals[:mode_count]
+        baseline_eigvals = baseline_record.eigvals[:mode_count]
         comparison_eigvals = comparison_record.eigvals[:mode_count]
-        first_cosine = float(np.dot(no_df_record.eigvecs[:, 0], comparison_record.eigvecs[:, 0]))
+        first_cosine = float(np.dot(baseline_record.eigvecs[:, 0], comparison_record.eigvecs[:, 0]))
         rows.append(
             {
                 "sample": sample,
-                "atoms": no_df_record.atoms,
+                "atoms": baseline_record.atoms,
                 "comparison": comparison_label,
                 "mode_count": mode_count,
-                "eigenvalue_mae": float(np.mean(np.abs(no_df_eigvals - comparison_eigvals))),
-                "no_df_negative_eigenvalues": int(np.sum(no_df_record.eigvals < negative_threshold)),
+                "eigenvalue_mae": float(np.mean(np.abs(baseline_eigvals - comparison_eigvals))),
+                "baseline_negative_eigenvalues": int(np.sum(baseline_record.eigvals < negative_threshold)),
                 "comparison_negative_eigenvalues": int(np.sum(comparison_record.eigvals < negative_threshold)),
                 "negative_eigenvalue_count_delta": int(
                     np.sum(comparison_record.eigvals < negative_threshold)
-                    - np.sum(no_df_record.eigvals < negative_threshold)
+                    - np.sum(baseline_record.eigvals < negative_threshold)
                 ),
                 "first_eigenvector_cosine": first_cosine,
                 "first_eigenvector_abs_cosine": abs(first_cosine),
@@ -661,6 +712,7 @@ def eckart_summary_rows(
 
 def write_summary_csv(
     output: Path,
+    ground_truth: dict[int, ResultRecord],
     no_df: dict[int, ResultRecord],
     df: dict[int, ResultRecord],
     uma: dict[int, ResultRecord],
@@ -675,6 +727,7 @@ def write_summary_csv(
             [
                 "sample",
                 "atoms",
+                "ground_truth_energy_hartree",
                 "no_df_energy_hartree",
                 "df_energy_hartree",
                 "uma_energy_ev",
@@ -682,6 +735,7 @@ def write_summary_csv(
                 "gxtb_energy_hartree",
                 "orca_energy_hartree",
                 "B3LYPD3BJdzvp_energy_kcal_mol",
+                "ground_truth_force_rms_hartree_per_bohr",
                 "no_df_force_rms_hartree_per_bohr",
                 "df_force_rms_hartree_per_bohr",
                 "uma_force_rms_ev_per_angstrom",
@@ -689,6 +743,7 @@ def write_summary_csv(
                 "gxtb_force_rms_hartree_per_bohr",
                 "orca_force_rms_hartree_per_bohr",
                 "B3LYPD3BJdzvp_force_rms_kcal_mol_per_angstrom",
+                "ground_truth_hessian_rms_hartree_per_bohr2",
                 "no_df_hessian_rms_hartree_per_bohr2",
                 "df_hessian_rms_hartree_per_bohr2",
                 "uma_hessian_rms_ev_per_angstrom2",
@@ -696,6 +751,7 @@ def write_summary_csv(
                 "gxtb_hessian_rms_hartree_per_bohr2",
                 "orca_hessian_rms_hartree_per_bohr2",
                 "B3LYPD3BJdzvp_hessian_rms_kcal_mol_per_angstrom2",
+                "ground_truth_file",
                 "no_df_file",
                 "df_file",
                 "uma_file",
@@ -704,18 +760,20 @@ def write_summary_csv(
                 "orca_file",
             ]
         )
-        for sample in sorted(set(no_df) | set(df) | set(uma) | set(xtb) | set(gxtb) | set(orca)):
+        for sample in sorted(set(ground_truth) | set(no_df) | set(df) | set(uma) | set(xtb) | set(gxtb) | set(orca)):
+            ground_truth_record = ground_truth.get(sample)
             no_df_record = no_df.get(sample)
             df_record = df.get(sample)
             uma_record = uma.get(sample)
             xtb_record = xtb.get(sample)
             gxtb_record = gxtb.get(sample)
             orca_record = orca.get(sample)
-            reference = no_df_record or df_record or uma_record or xtb_record or gxtb_record or orca_record
+            reference = ground_truth_record or no_df_record or df_record or uma_record or xtb_record or gxtb_record or orca_record
             writer.writerow(
                 [
                     sample,
                     reference.atoms if reference else "",
+                    ground_truth_record.energy if ground_truth_record else "",
                     no_df_record.energy if no_df_record else "",
                     df_record.energy if df_record else "",
                     uma_record.energy if uma_record else "",
@@ -723,6 +781,7 @@ def write_summary_csv(
                     gxtb_record.energy if gxtb_record else "",
                     orca_record.energy if orca_record else "",
                     reference.reference_energy if reference else "",
+                    ground_truth_record.force_rms if ground_truth_record else "",
                     no_df_record.force_rms if no_df_record else "",
                     df_record.force_rms if df_record else "",
                     uma_record.force_rms if uma_record else "",
@@ -730,6 +789,7 @@ def write_summary_csv(
                     gxtb_record.force_rms if gxtb_record else "",
                     orca_record.force_rms if orca_record else "",
                     reference.reference_force_rms if reference else "",
+                    ground_truth_record.hessian_rms if ground_truth_record else "",
                     no_df_record.hessian_rms if no_df_record else "",
                     df_record.hessian_rms if df_record else "",
                     uma_record.hessian_rms if uma_record else "",
@@ -737,6 +797,7 @@ def write_summary_csv(
                     gxtb_record.hessian_rms if gxtb_record else "",
                     orca_record.hessian_rms if orca_record else "",
                     reference.reference_hessian_rms if reference else "",
+                    ground_truth_record.path if ground_truth_record else "",
                     no_df_record.path if no_df_record else "",
                     df_record.path if df_record else "",
                     uma_record.path if uma_record else "",
@@ -758,7 +819,7 @@ def write_eckart_summary_csv(output: Path, rows: list[dict[str, float | int | st
                 "comparison",
                 "mode_count",
                 "eigenvalue_mae",
-                "no_df_negative_eigenvalues",
+                "baseline_negative_eigenvalues",
                 "comparison_negative_eigenvalues",
                 "negative_eigenvalue_count_delta",
                 "first_eigenvector_cosine",
@@ -773,7 +834,7 @@ def write_eckart_summary_csv(output: Path, rows: list[dict[str, float | int | st
                     row["comparison"],
                     row["mode_count"],
                     row["eigenvalue_mae"],
-                    row["no_df_negative_eigenvalues"],
+                    row["baseline_negative_eigenvalues"],
                     row["comparison_negative_eigenvalues"],
                     row["negative_eigenvalue_count_delta"],
                     row["first_eigenvector_cosine"],
@@ -785,12 +846,13 @@ def write_eckart_summary_csv(output: Path, rows: list[dict[str, float | int | st
 def print_method_summary_table(
     hessian_rows: list[dict[str, float | int | str]],
     eckart_rows: list[dict[str, float | int | str]],
+    comparison_order: list[str] | None = None,
 ) -> None:
     if not hessian_rows and not eckart_rows:
         return
 
     comparison_rows = hessian_rows + eckart_rows
-    method_width = max(38, *(len(comparison) for comparison in ordered_comparisons(comparison_rows)))
+    method_width = max(38, *(len(comparison) for comparison in ordered_comparisons(comparison_rows, comparison_order)))
     hessian_width = len("H MAE (eV/A^2)")
     eigenvalue_width = len("EigVal MAE")
     cosine_width = len("|cos v1|")
@@ -802,7 +864,7 @@ def print_method_summary_table(
     )
     print(header)
     print("-" * len(header))
-    for comparison in ordered_comparisons(comparison_rows):
+    for comparison in ordered_comparisons(comparison_rows, comparison_order):
         hessian_values = [float(row["hessian_mae"]) for row in hessian_rows if row["comparison"] == comparison]
         eigenvalue_values = [float(row["eigenvalue_mae"]) for row in eckart_rows if row["comparison"] == comparison]
         cosine_values = [
@@ -825,9 +887,11 @@ def main() -> None:
     uma_dir = Path(args.uma_dir)
     xtb_dir = Path(args.xtb_dir)
     gxtb_dir = Path(args.gxtb_dir)
+    ground_truth_dir = Path(args.ground_truth_dir)
     orca_dir = Path(args.orca_dir)
     output_dir = Path(args.output_dir)
 
+    ground_truth = read_records(ground_truth_dir, args.ground_truth_pattern)
     no_df = read_records(no_df_dir, args.pattern)
     df = read_records(df_dir, args.pattern)
     uma = read_records(uma_dir, args.uma_pattern)
@@ -838,7 +902,16 @@ def main() -> None:
         raise SystemExit(f"No no-DF result files found in {no_df_dir}")
     if not df:
         raise SystemExit(f"No DF result files found in {df_dir}")
+    if not ground_truth:
+        raise SystemExit(f"No ground-truth result files found in {ground_truth_dir}")
 
+    ground_truth_modes = read_mode_records(
+        ground_truth_dir,
+        args.ground_truth_pattern,
+        hessian_name="hessian",
+        hessian_factor=PYSCF_PLOT_FACTORS["hessian_rms"],
+        rot_thresh=args.rot_thresh,
+    )
     no_df_modes = read_mode_records(
         no_df_dir,
         args.pattern,
@@ -854,8 +927,8 @@ def main() -> None:
         rot_thresh=args.rot_thresh,
     )
     themol_modes = read_mode_records(
-        no_df_dir,
-        args.pattern,
+        ground_truth_dir,
+        args.ground_truth_pattern,
         hessian_name="reference_hessian",
         hessian_factor=THEMOL_PLOT_FACTORS["hessian_rms"],
         rot_thresh=args.rot_thresh,
@@ -891,126 +964,168 @@ def main() -> None:
     plot_specs = [
         (
             make_reference_rows(
-                no_df,
+                ground_truth,
                 "energy",
                 "reference_energy",
                 PYSCF_PLOT_FACTORS["energy"],
                 THEMOL_PLOT_FACTORS["energy"],
             ),
-            "No-DF energy (eV)",
+            f"{GROUND_TRUTH_LABEL} energy (eV)",
             "THEMol energy (eV)",
-            "THEMol vs No-DF Energy",
-            output_dir / "B3LYPD3BJdzvp_vs_wB97MVdef2TZVPD_energy.png",
+            f"{THEMOL_LABEL} vs {GROUND_TRUTH_LABEL} Energy",
+            output_dir / "B3LYPD3BJdzvp_vs_wB97MD4def2QZVPPD_energy.png",
         ),
         (
             make_reference_rows(
-                no_df,
+                ground_truth,
                 "force_rms",
                 "reference_force_rms",
                 PYSCF_PLOT_FACTORS["force_rms"],
                 THEMOL_PLOT_FACTORS["force_rms"],
             ),
-            "No-DF force RMS (eV/A)",
+            f"{GROUND_TRUTH_LABEL} force RMS (eV/A)",
             "THEMol force RMS (eV/A)",
-            "THEMol vs No-DF Force RMS",
-            output_dir / "B3LYPD3BJdzvp_vs_wB97MVdef2TZVPD_force_rms.png",
+            f"{THEMOL_LABEL} vs {GROUND_TRUTH_LABEL} Force RMS",
+            output_dir / "B3LYPD3BJdzvp_vs_wB97MD4def2QZVPPD_force_rms.png",
         ),
         (
             make_reference_rows(
-                no_df,
+                ground_truth,
                 "hessian_rms",
                 "reference_hessian_rms",
                 PYSCF_PLOT_FACTORS["hessian_rms"],
                 THEMOL_PLOT_FACTORS["hessian_rms"],
             ),
-            "No-DF Hessian RMS (eV/A^2)",
+            f"{GROUND_TRUTH_LABEL} Hessian RMS (eV/A^2)",
             "THEMol Hessian RMS (eV/A^2)",
-            "THEMol vs No-DF Hessian RMS",
-            output_dir / "B3LYPD3BJdzvp_vs_wB97MVdef2TZVPD_hessian_rms.png",
+            f"{THEMOL_LABEL} vs {GROUND_TRUTH_LABEL} Hessian RMS",
+            output_dir / "B3LYPD3BJdzvp_vs_wB97MD4def2QZVPPD_hessian_rms.png",
         ),
         (
             make_pair_rows(
+                ground_truth,
                 no_df,
+                "energy",
+                "energy",
+                PYSCF_PLOT_FACTORS["energy"],
+                PYSCF_PLOT_FACTORS["energy"],
+            ),
+            f"{GROUND_TRUTH_LABEL} energy (eV)",
+            f"{PYSCF_REFERENCE_LABEL} energy (eV)",
+            f"{GROUND_TRUTH_LABEL} vs {PYSCF_REFERENCE_LABEL} Energy",
+            output_dir / "wB97MVdef2TZVPD_vs_wB97MD4def2QZVPPD_energy.png",
+        ),
+        (
+            make_pair_rows(
+                ground_truth,
+                no_df,
+                "force_rms",
+                "force_rms",
+                PYSCF_PLOT_FACTORS["force_rms"],
+                PYSCF_PLOT_FACTORS["force_rms"],
+            ),
+            f"{GROUND_TRUTH_LABEL} force RMS (eV/A)",
+            f"{PYSCF_REFERENCE_LABEL} force RMS (eV/A)",
+            f"{GROUND_TRUTH_LABEL} vs {PYSCF_REFERENCE_LABEL} Force RMS",
+            output_dir / "wB97MVdef2TZVPD_vs_wB97MD4def2QZVPPD_force_rms.png",
+        ),
+        (
+            make_pair_rows(
+                ground_truth,
+                no_df,
+                "hessian_rms",
+                "hessian_rms",
+                PYSCF_PLOT_FACTORS["hessian_rms"],
+                PYSCF_PLOT_FACTORS["hessian_rms"],
+            ),
+            f"{GROUND_TRUTH_LABEL} Hessian RMS (eV/A^2)",
+            f"{PYSCF_REFERENCE_LABEL} Hessian RMS (eV/A^2)",
+            f"{GROUND_TRUTH_LABEL} vs {PYSCF_REFERENCE_LABEL} Hessian RMS",
+            output_dir / "wB97MVdef2TZVPD_vs_wB97MD4def2QZVPPD_hessian_rms.png",
+        ),
+        (
+            make_pair_rows(
+                ground_truth,
                 uma,
                 "energy",
                 "energy",
                 PYSCF_PLOT_FACTORS["energy"],
                 UMA_PLOT_FACTORS["energy"],
             ),
-            "No-DF energy (eV)",
+            f"{GROUND_TRUTH_LABEL} energy (eV)",
             "UMA energy (eV)",
-            "UMA vs No-DF Energy",
-            output_dir / "uma_vs_wB97MVdef2TZVPD_energy.png",
+            f"UMA vs {GROUND_TRUTH_LABEL} Energy",
+            output_dir / "uma_vs_wB97MD4def2QZVPPD_energy.png",
         ),
         (
             make_pair_rows(
-                no_df,
+                ground_truth,
                 uma,
                 "force_rms",
                 "force_rms",
                 PYSCF_PLOT_FACTORS["force_rms"],
                 UMA_PLOT_FACTORS["force_rms"],
             ),
-            "No-DF force RMS (eV/A)",
+            f"{GROUND_TRUTH_LABEL} force RMS (eV/A)",
             "UMA force RMS (eV/A)",
-            "UMA vs No-DF Force RMS",
-            output_dir / "uma_vs_wB97MVdef2TZVPD_force_rms.png",
+            f"UMA vs {GROUND_TRUTH_LABEL} Force RMS",
+            output_dir / "uma_vs_wB97MD4def2QZVPPD_force_rms.png",
         ),
         (
             make_pair_rows(
-                no_df,
+                ground_truth,
                 uma,
                 "hessian_rms",
                 "hessian_rms",
                 PYSCF_PLOT_FACTORS["hessian_rms"],
                 UMA_PLOT_FACTORS["hessian_rms"],
             ),
-            "No-DF Hessian RMS (eV/A^2)",
+            f"{GROUND_TRUTH_LABEL} Hessian RMS (eV/A^2)",
             "UMA Hessian RMS (eV/A^2)",
-            "UMA vs No-DF Hessian RMS",
-            output_dir / "uma_vs_wB97MVdef2TZVPD_hessian_rms.png",
+            f"UMA vs {GROUND_TRUTH_LABEL} Hessian RMS",
+            output_dir / "uma_vs_wB97MD4def2QZVPPD_hessian_rms.png",
         ),
         (
             make_pair_rows(
-                no_df,
+                ground_truth,
                 xtb,
                 "hessian_rms",
                 "hessian_rms",
                 PYSCF_PLOT_FACTORS["hessian_rms"],
                 PYSCF_PLOT_FACTORS["hessian_rms"],
             ),
-            "ωB97M-V/def2-TZVPD Hessian RMS (eV/A^2)",
+            f"{GROUND_TRUTH_LABEL} Hessian RMS (eV/A^2)",
             "GFN2-xTB Hessian RMS (eV/A^2)",
-            "ωB97M-V/def2-TZVPD vs GFN2-xTB Hessian RMS",
-            output_dir / "xtb_gfn2_vs_wB97MVdef2TZVPD_hessian_rms.png",
+            f"{XTB_COMPARISON_LABEL} Hessian RMS",
+            output_dir / "xtb_gfn2_vs_wB97MD4def2QZVPPD_hessian_rms.png",
         ),
         (
             make_pair_rows(
-                no_df,
+                ground_truth,
                 gxtb,
                 "hessian_rms",
                 "hessian_rms",
                 PYSCF_PLOT_FACTORS["hessian_rms"],
                 PYSCF_PLOT_FACTORS["hessian_rms"],
             ),
-            "ωB97M-V/def2-TZVPD Hessian RMS (eV/A^2)",
+            f"{GROUND_TRUTH_LABEL} Hessian RMS (eV/A^2)",
             "g-xTB Hessian RMS (eV/A^2)",
-            "ωB97M-V/def2-TZVPD vs g-xTB Hessian RMS",
-            output_dir / "gxtb_vs_wB97MVdef2TZVPD_hessian_rms.png",
+            f"{GXTB_COMPARISON_LABEL} Hessian RMS",
+            output_dir / "gxtb_vs_wB97MD4def2QZVPPD_hessian_rms.png",
         ),
         (
             make_pair_rows(
-                no_df,
+                ground_truth,
                 orca,
                 "hessian_rms",
                 "hessian_rms",
                 PYSCF_PLOT_FACTORS["hessian_rms"],
                 PYSCF_PLOT_FACTORS["hessian_rms"],
             ),
-            "ωB97M-V/def2-TZVPD Hessian RMS (eV/A^2)",
+            f"{GROUND_TRUTH_LABEL} Hessian RMS (eV/A^2)",
             "ORCA wB97M-D4/def2-TZVPD Hessian RMS (eV/A^2)",
-            "ωB97M-V/def2-TZVPD vs ORCA wB97M-D4/def2-TZVPD Hessian RMS",
-            output_dir / "orca_vs_wB97MVdef2TZVPD_hessian_rms.png",
+            f"{ORCA_COMPARISON_LABEL} Hessian RMS",
+            output_dir / "orca_tzvpd_vs_wB97MD4def2QZVPPD_hessian_rms.png",
         ),
     ]
 
@@ -1024,12 +1139,79 @@ def main() -> None:
             skipped.append(output.name)
 
     scalar_comparison_methods = [
-        # ("ωB97M-V/def2-TZVPD vs w. Dens.Fit.", df, PYSCF_PLOT_FACTORS),
+        # (f"{GROUND_TRUTH_LABEL} vs w. Dens.Fit.", df, PYSCF_PLOT_FACTORS),
         (UMA_COMPARISON_LABEL, uma, UMA_PLOT_FACTORS),
-        ("ωB97M-V/def2-TZVPD vs GFN2-xTB", xtb, PYSCF_PLOT_FACTORS),
-        ("ωB97M-V/def2-TZVPD vs g-xTB", gxtb, PYSCF_PLOT_FACTORS),
+        (XTB_COMPARISON_LABEL, xtb, PYSCF_PLOT_FACTORS),
+        (GXTB_COMPARISON_LABEL, gxtb, PYSCF_PLOT_FACTORS),
         (ORCA_COMPARISON_LABEL, orca, PYSCF_PLOT_FACTORS),
+        (PYSCF_COMPARISON_LABEL, no_df, PYSCF_PLOT_FACTORS),
     ]
+    hessian_mae_by_atoms_rows = (
+        # hessian_mae_rows(
+        #     ground_truth,
+        #     df,
+        #     f"{GROUND_TRUTH_LABEL} vs w. Dens.Fit.",
+        #     "hessian",
+        #     "hessian",
+        #     PYSCF_PLOT_FACTORS["hessian_rms"],
+        #     PYSCF_PLOT_FACTORS["hessian_rms"],
+        # )
+        hessian_mae_rows(
+            ground_truth,
+            ground_truth,
+            THEMOL_COMPARISON_LABEL,
+            "hessian",
+            "reference_hessian",
+            PYSCF_PLOT_FACTORS["hessian_rms"],
+            THEMOL_PLOT_FACTORS["hessian_rms"],
+        )
+        + hessian_mae_rows(
+            ground_truth,
+            uma,
+            UMA_COMPARISON_LABEL,
+            "hessian",
+            "hessian",
+            PYSCF_PLOT_FACTORS["hessian_rms"],
+            UMA_PLOT_FACTORS["hessian_rms"],
+        )
+        + hessian_mae_rows(
+            ground_truth,
+            xtb,
+            XTB_COMPARISON_LABEL,
+            "hessian",
+            "hessian",
+            PYSCF_PLOT_FACTORS["hessian_rms"],
+            PYSCF_PLOT_FACTORS["hessian_rms"],
+        )
+        + hessian_mae_rows(
+            ground_truth,
+            gxtb,
+            GXTB_COMPARISON_LABEL,
+            "hessian",
+            "hessian",
+            PYSCF_PLOT_FACTORS["hessian_rms"],
+            PYSCF_PLOT_FACTORS["hessian_rms"],
+        )
+        + hessian_mae_rows(
+            ground_truth,
+            orca,
+            ORCA_COMPARISON_LABEL,
+            "hessian",
+            "hessian",
+            PYSCF_PLOT_FACTORS["hessian_rms"],
+            PYSCF_PLOT_FACTORS["hessian_rms"],
+        )
+        + hessian_mae_rows(
+            ground_truth,
+            no_df,
+            PYSCF_COMPARISON_LABEL,
+            "hessian",
+            "hessian",
+            PYSCF_PLOT_FACTORS["hessian_rms"],
+            PYSCF_PLOT_FACTORS["hessian_rms"],
+        )
+    )
+    hessian_comparison_order = list(reversed(ordered_comparisons_by_mean_metric(hessian_mae_by_atoms_rows, "hessian_mae")))
     error_plot_specs = [
         (
             "energy",
@@ -1038,7 +1220,6 @@ def main() -> None:
             output_dir / "energy_mae_by_atoms.png",
             None,
             "linear",
-            False,
         ),
         (
             "force_rms",
@@ -1047,16 +1228,23 @@ def main() -> None:
             output_dir / "force_rms_mae_by_atoms.png",
             None,
             "linear",
-            False,
+        ),
+        (
+            "force_rms",
+            "Force RMS MAE (eV/A)",
+            "Force RMS MAE",
+            output_dir / "force_rms_mae_by_atoms_log.png",
+            None,
+            "log",
         ),
     ]
-    for metric, y_label, title, output, y_tick_format, y_scale, legend_above in error_plot_specs:
+    for metric, y_label, title, output, y_tick_format, y_scale in error_plot_specs:
         rows = []
         for comparison, records, factors in scalar_comparison_methods:
             row_factory = make_offset_corrected_error_rows if metric == "energy" else make_absolute_error_rows
             rows.extend(
                 row_factory(
-                    no_df,
+                    ground_truth,
                     records,
                     metric,
                     metric,
@@ -1075,68 +1263,12 @@ def main() -> None:
                 args.dpi,
                 y_tick_format,
                 y_scale,
-                legend_above,
+                comparison_order=hessian_comparison_order,
             )
             written.append((output, len(rows)))
         else:
             skipped.append(output.name)
 
-    hessian_mae_by_atoms_rows = (
-        # hessian_mae_rows(
-        #     no_df,
-        #     df,
-        #     "ωB97M-V/def2-TZVPD vs w. Dens.Fit.",
-        #     "hessian",
-        #     "hessian",
-        #     PYSCF_PLOT_FACTORS["hessian_rms"],
-        #     PYSCF_PLOT_FACTORS["hessian_rms"],
-        # )
-        hessian_mae_rows(
-            no_df,
-            no_df,
-            "ωB97M-V/def2-TZVPD vs B3LYP-D3BJ/dzvp",
-            "hessian",
-            "reference_hessian",
-            PYSCF_PLOT_FACTORS["hessian_rms"],
-            THEMOL_PLOT_FACTORS["hessian_rms"],
-        )
-        + hessian_mae_rows(
-            no_df,
-            uma,
-            UMA_COMPARISON_LABEL,
-            "hessian",
-            "hessian",
-            PYSCF_PLOT_FACTORS["hessian_rms"],
-            UMA_PLOT_FACTORS["hessian_rms"],
-        )
-        + hessian_mae_rows(
-            no_df,
-            xtb,
-            "ωB97M-V/def2-TZVPD vs GFN2-xTB",
-            "hessian",
-            "hessian",
-            PYSCF_PLOT_FACTORS["hessian_rms"],
-            PYSCF_PLOT_FACTORS["hessian_rms"],
-        )
-        + hessian_mae_rows(
-            no_df,
-            gxtb,
-            "ωB97M-V/def2-TZVPD vs g-xTB",
-            "hessian",
-            "hessian",
-            PYSCF_PLOT_FACTORS["hessian_rms"],
-            PYSCF_PLOT_FACTORS["hessian_rms"],
-        )
-        + hessian_mae_rows(
-            no_df,
-            orca,
-            ORCA_COMPARISON_LABEL,
-            "hessian",
-            "hessian",
-            PYSCF_PLOT_FACTORS["hessian_rms"],
-            PYSCF_PLOT_FACTORS["hessian_rms"],
-        )
-    )
     if hessian_mae_by_atoms_rows:
         metric_by_atoms_plot(
             hessian_mae_by_atoms_rows,
@@ -1145,21 +1277,45 @@ def main() -> None:
             "Hessian MAE",
             output_dir / "hessian_mae_by_atoms.png",
             args.dpi,
+            comparison_order=hessian_comparison_order,
         )
         written.append((output_dir / "hessian_mae_by_atoms.png", len(hessian_mae_by_atoms_rows)))
+        metric_by_atoms_plot(
+            hessian_mae_by_atoms_rows,
+            "hessian_mae",
+            "Hessian MAE (eV/A^2)",
+            "Hessian MAE",
+            output_dir / "hessian_mae_by_atoms_log.png",
+            args.dpi,
+            y_scale="log",
+            comparison_order=hessian_comparison_order,
+        )
+        written.append((output_dir / "hessian_mae_by_atoms_log.png", len(hessian_mae_by_atoms_rows)))
     else:
         skipped.append("hessian_mae_by_atoms.png")
+        skipped.append("hessian_mae_by_atoms_log.png")
 
     eckart_rows = (
-        # eckart_summary_rows(no_df_modes, df_modes, "ωB97M-V/def2-TZVPD vs w. Dens.Fit.", args.negative_eigval_threshold)
-        eckart_summary_rows(no_df_modes, themol_modes, "ωB97M-V/def2-TZVPD vs B3LYP-D3BJ/dzvp", args.negative_eigval_threshold)
-        + eckart_summary_rows(no_df_modes, uma_modes, UMA_COMPARISON_LABEL, args.negative_eigval_threshold)
-        + eckart_summary_rows(no_df_modes, xtb_modes, "ωB97M-V/def2-TZVPD vs GFN2-xTB", args.negative_eigval_threshold)
-        + eckart_summary_rows(no_df_modes, gxtb_modes, "ωB97M-V/def2-TZVPD vs g-xTB", args.negative_eigval_threshold)
+        # eckart_summary_rows(ground_truth_modes, df_modes, f"{GROUND_TRUTH_LABEL} vs w. Dens.Fit.", args.negative_eigval_threshold)
+        eckart_summary_rows(
+            ground_truth_modes,
+            themol_modes,
+            THEMOL_COMPARISON_LABEL,
+            args.negative_eigval_threshold,
+        )
+        + eckart_summary_rows(ground_truth_modes, uma_modes, UMA_COMPARISON_LABEL, args.negative_eigval_threshold)
+        + eckart_summary_rows(ground_truth_modes, xtb_modes, XTB_COMPARISON_LABEL, args.negative_eigval_threshold)
+        + eckart_summary_rows(ground_truth_modes, gxtb_modes, GXTB_COMPARISON_LABEL, args.negative_eigval_threshold)
         + eckart_summary_rows(
-            no_df_modes,
+            ground_truth_modes,
             orca_modes,
             ORCA_COMPARISON_LABEL,
+            args.negative_eigval_threshold,
+        )
+        + eckart_summary_rows(
+            ground_truth_modes,
+            no_df_modes,
+            PYSCF_COMPARISON_LABEL,
             args.negative_eigval_threshold,
         )
     )
@@ -1169,34 +1325,62 @@ def main() -> None:
             "Eckart Hessian eigenvalue MAE (eV/A^2/amu)",
             "Eckart Hessian Eigenvalue MAE",
             output_dir / "eckart_eigenvalue_mae_by_atoms.png",
+            "linear",
+            None,
+        ),
+        (
+            "eigenvalue_mae",
+            "Eckart Hessian eigenvalue MAE (eV/A^2/amu)",
+            "Eckart Hessian Eigenvalue MAE",
+            output_dir / "eckart_eigenvalue_mae_by_atoms_log.png",
+            "log",
+            None,
         ),
         (
             "first_eigenvector_abs_cosine",
             "|cos(first Hessian eigenvector)|",
             "First Eckart Eigenvector Cosine Similarity",
             output_dir / "eckart_first_eigenvector_cosine_by_atoms.png",
+            "linear",
+            (0.7, 1.0),
         ),
     ]
-    for metric, y_label, title, output in eckart_plot_specs:
+    for metric, y_label, title, output, y_scale, y_clip in eckart_plot_specs:
         if eckart_rows:
-            metric_by_atoms_plot(eckart_rows, metric, y_label, title, output, args.dpi)
+            metric_by_atoms_plot(
+                eckart_rows,
+                metric,
+                y_label,
+                title,
+                output,
+                args.dpi,
+                y_scale=y_scale,
+                comparison_order=hessian_comparison_order,
+                y_clip=y_clip,
+            )
             written.append((output, len(eckart_rows)))
         else:
             skipped.append(output.name)
     if eckart_rows:
-        negative_count_plot(eckart_rows, output_dir / "eckart_negative_eigenvalue_counts.png", args.dpi)
+        negative_count_plot(
+            eckart_rows,
+            output_dir / "eckart_negative_eigenvalue_counts.png",
+            args.dpi,
+            comparison_order=hessian_comparison_order,
+        )
         written.append((output_dir / "eckart_negative_eigenvalue_counts.png", len(eckart_rows)))
     else:
         skipped.append("eckart_negative_eigenvalue_counts.png")
 
     summary_path = output_dir / "pyscf_comparison_metrics.csv"
-    write_summary_csv(summary_path, no_df, df, uma, xtb, gxtb, orca)
+    write_summary_csv(summary_path, ground_truth, no_df, df, uma, xtb, gxtb, orca)
     eckart_summary_path = output_dir / "pyscf_eckart_summary_metrics.csv"
     write_eckart_summary_csv(eckart_summary_path, eckart_rows)
 
     print(
-        f"Read {len(no_df)} no-DF files, {len(df)} DF files, {len(uma)} UMA files, "
-        f"{len(xtb)} GFN2-xTB files, {len(gxtb)} g-xTB files, and {len(orca)} ORCA files."
+        f"Read {len(ground_truth)} ground-truth files, {len(no_df)} no-DF files, {len(df)} DF files, "
+        f"{len(uma)} UMA files, {len(xtb)} GFN2-xTB files, {len(gxtb)} g-xTB files, "
+        f"and {len(orca)} ORCA TZVPD files."
     )
     for output, count in written:
         print(f"Wrote\n {output} ({count} points)")
@@ -1204,7 +1388,7 @@ def main() -> None:
         print(f"Skipped {name}: no paired data available")
     print(f"Wrote\n {summary_path}")
     print(f"Wrote\n {eckart_summary_path}")
-    print_method_summary_table(hessian_mae_by_atoms_rows, eckart_rows)
+    print_method_summary_table(hessian_mae_by_atoms_rows, eckart_rows, comparison_order=hessian_comparison_order)
 
 
 if __name__ == "__main__":
