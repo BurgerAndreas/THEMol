@@ -10,6 +10,7 @@ import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TypeVar
 
 import h5py
 import matplotlib.pyplot as plt
@@ -82,7 +83,8 @@ METHOD_ORDER = (
     # f"{GROUND_TRUTH_LABEL} vs w. Dens.Fit.",
 )
 METHOD_STYLE_INDEX = {method: idx for idx, method in enumerate(METHOD_ORDER)}
-EXCLUDED_HESSIAN_MAE_SAMPLES = {59}
+EXCLUDED_PLOT_SAMPLES = {59}
+RecordT = TypeVar("RecordT")
 
 
 def ordered_comparisons(
@@ -136,6 +138,10 @@ class ModeRecord:
     atoms: int
     eigvals: np.ndarray
     eigvecs: np.ndarray
+
+
+def exclude_samples(records: dict[int, RecordT], samples: set[int]) -> dict[int, RecordT]:
+    return {sample: record for sample, record in records.items() if sample not in samples}
 
 
 def parse_args() -> argparse.Namespace:
@@ -914,6 +920,13 @@ def main() -> None:
     xtb = read_records(xtb_dir, args.xtb_pattern)
     gxtb = read_records(gxtb_dir, args.gxtb_pattern)
     orca = read_records(orca_dir, args.orca_pattern)
+    ground_truth = exclude_samples(ground_truth, EXCLUDED_PLOT_SAMPLES)
+    no_df = exclude_samples(no_df, EXCLUDED_PLOT_SAMPLES)
+    df = exclude_samples(df, EXCLUDED_PLOT_SAMPLES)
+    uma = exclude_samples(uma, EXCLUDED_PLOT_SAMPLES)
+    xtb = exclude_samples(xtb, EXCLUDED_PLOT_SAMPLES)
+    gxtb = exclude_samples(gxtb, EXCLUDED_PLOT_SAMPLES)
+    orca = exclude_samples(orca, EXCLUDED_PLOT_SAMPLES)
     if not no_df:
         raise SystemExit(f"No no-DF result files found in {no_df_dir}")
     if not df:
@@ -977,6 +990,14 @@ def main() -> None:
         hessian_factor=PYSCF_PLOT_FACTORS["hessian_rms"],
         rot_thresh=args.rot_thresh,
     )
+    ground_truth_modes = exclude_samples(ground_truth_modes, EXCLUDED_PLOT_SAMPLES)
+    no_df_modes = exclude_samples(no_df_modes, EXCLUDED_PLOT_SAMPLES)
+    df_modes = exclude_samples(df_modes, EXCLUDED_PLOT_SAMPLES)
+    themol_modes = exclude_samples(themol_modes, EXCLUDED_PLOT_SAMPLES)
+    uma_modes = exclude_samples(uma_modes, EXCLUDED_PLOT_SAMPLES)
+    xtb_modes = exclude_samples(xtb_modes, EXCLUDED_PLOT_SAMPLES)
+    gxtb_modes = exclude_samples(gxtb_modes, EXCLUDED_PLOT_SAMPLES)
+    orca_modes = exclude_samples(orca_modes, EXCLUDED_PLOT_SAMPLES)
     plot_specs = [
         (
             make_reference_rows(
@@ -1227,9 +1248,6 @@ def main() -> None:
             PYSCF_PLOT_FACTORS["hessian_rms"],
         )
     )
-    hessian_mae_by_atoms_rows = [
-        row for row in hessian_mae_by_atoms_rows if int(row["sample"]) not in EXCLUDED_HESSIAN_MAE_SAMPLES
-    ]
     hessian_comparison_order = list(reversed(ordered_comparisons_by_mean_metric(hessian_mae_by_atoms_rows, "hessian_mae")))
     error_plot_specs = [
         (
