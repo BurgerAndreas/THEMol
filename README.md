@@ -21,7 +21,7 @@ On 10 Hessians with 3-28 atoms:
 | ωB97M-V/def2-TZVPD vs wB97M-D4/def2-TZVPD | 0.021 | 0.022 | 0.990 |
 | ωB97M-V/def2-TZVPD vs UMA | 0.092 | 0.032 | 0.986 |
 
-For comparison, here are the results we reported for our Hessian Interatomic Potentials (HIP) paper, where the methods were all trained on ωB97x/6-31G(d):
+For comparison, here are the results we reported for our [Hessian Interatomic Potentials (HIP)](https://arxiv.org/abs/2509.21624) paper, where the methods were all trained on ωB97x/6-31G(d):
 
 | Model | Hessian Method | Hessian Trained | H MAE ↓ eV/Å² | EigVals λ MAE ↓ eV/Å² | \|cos first EigVec v₁\| ↑ | First EigVal λ₁ ↓ eV/Å² | Time ↓ ms |
 |---|---|---:|---:|---:|---:|---:|---:|
