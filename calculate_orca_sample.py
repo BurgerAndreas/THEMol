@@ -34,6 +34,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--basis", default="def2-TZVPD", help="ORCA basis keyword.")
     parser.add_argument("--grid", default="DefGrid3", help="ORCA integration grid keyword.")
     parser.add_argument("--scf", default="TightSCF", help="ORCA SCF convergence keyword.")
+    parser.add_argument(
+        "--scf-max-iter",
+        type=int,
+        help="Write an ORCA %%scf block with this MaxIter value.",
+    )
     parser.add_argument("--charge", type=int, help="Override molecular charge.")
     parser.add_argument(
         "--spin",
@@ -181,9 +186,21 @@ def write_orca_input(
         "",
         f"%pal nprocs {args.nprocs} end",
         f"%maxcore {maxcore_mb}",
-        "",
-        f"* xyz {charge} {multiplicity}",
     ]
+    if args.scf_max_iter is not None:
+        lines.extend(
+            [
+                "%scf",
+                f"  MaxIter {args.scf_max_iter}",
+                "end",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            f"* xyz {charge} {multiplicity}",
+        ]
+    )
     for atomic_number, xyz in zip(sample["atomic_numbers"], sample["coords"]):
         symbol = symbol_from_atomic_number(int(atomic_number))
         lines.append(f"  {symbol:<2s} {xyz[0]: .12f} {xyz[1]: .12f} {xyz[2]: .12f}")

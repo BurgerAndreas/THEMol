@@ -23,6 +23,12 @@ sns.set_theme(context="poster", style="whitegrid", font_scale=0.6)
 plt.rcParams["axes.linewidth"] *= 0.2
 plt.rcParams["grid.linewidth"] *= 0.5
 plt.rcParams["legend.fontsize"] *= 0.6
+plt.rcParams["xtick.labelsize"] *= 0.8
+plt.rcParams["ytick.labelsize"] *= 0.9
+plt.rcParams["xtick.major.size"] *= 0.5
+plt.rcParams["ytick.major.size"] *= 0.5
+plt.rcParams["xtick.minor.size"] *= 0.5
+plt.rcParams["ytick.minor.size"] *= 0.5
 
 BOHR2ANG = 0.529177210903
 ANG2BOHR = 1.0 / BOHR2ANG
@@ -76,6 +82,7 @@ METHOD_ORDER = (
     # f"{GROUND_TRUTH_LABEL} vs w. Dens.Fit.",
 )
 METHOD_STYLE_INDEX = {method: idx for idx, method in enumerate(METHOD_ORDER)}
+EXCLUDED_HESSIAN_MAE_SAMPLES = {59}
 
 
 def ordered_comparisons(
@@ -405,7 +412,7 @@ def add_identity_line(ax, xs: list[float], ys: list[float]) -> None:
 
 
 def add_legend_above(ax) -> None:
-    ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.02), frameon=True, edgecolor="none")
+    ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.001), frameon=True, edgecolor="none")
 
 
 def scatter_plot(
@@ -478,15 +485,24 @@ def metric_by_atoms_plot(
     ax.set_xlabel("Atom count")
     ax.set_ylabel(y_label)
     ax.set_yscale(y_scale)
+    ax.tick_params(axis="both", which="major", pad=0, length=1.5)
     if y_scale == "log":
         ax.yaxis.set_minor_locator(mticker.LogLocator(base=10.0, subs=np.arange(2, 10) * 0.1))
         ax.yaxis.set_minor_formatter(mticker.NullFormatter())
-        ax.tick_params(axis="y", which="minor", length=3)
+        ax.tick_params(axis="y", which="minor", length=1)
     if y_tick_format is not None:
         ax.yaxis.set_major_formatter(mticker.StrMethodFormatter(y_tick_format))
     atom_counts = sorted({int(row["atoms"]) for row in rows})
     ax.set_xticks(atom_counts)
-    ax.set_xticklabels([str(atom_count) for atom_count in atom_counts])
+    last_labeled_atom_count: int | None = None
+    x_tick_labels = []
+    for atom_count in atom_counts:
+        if last_labeled_atom_count is None or atom_count - last_labeled_atom_count >= 2:
+            x_tick_labels.append(str(atom_count))
+            last_labeled_atom_count = atom_count
+        else:
+            x_tick_labels.append("")
+    ax.set_xticklabels(x_tick_labels)
     add_legend_above(ax)
     ax.grid(True, alpha=0.25)
     if y_scale == "log":
@@ -1085,20 +1101,20 @@ def main() -> None:
             f"UMA vs {GROUND_TRUTH_LABEL} Hessian RMS",
             output_dir / "uma_vs_wB97MD4def2QZVPPD_hessian_rms.png",
         ),
-        (
-            make_pair_rows(
-                ground_truth,
-                xtb,
-                "hessian_rms",
-                "hessian_rms",
-                PYSCF_PLOT_FACTORS["hessian_rms"],
-                PYSCF_PLOT_FACTORS["hessian_rms"],
-            ),
-            f"{GROUND_TRUTH_LABEL} Hessian RMS (eV/A^2)",
-            "GFN2-xTB Hessian RMS (eV/A^2)",
-            f"{XTB_COMPARISON_LABEL} Hessian RMS",
-            output_dir / "xtb_gfn2_vs_wB97MD4def2QZVPPD_hessian_rms.png",
-        ),
+        # (
+        #     make_pair_rows(
+        #         ground_truth,
+        #         xtb,
+        #         "hessian_rms",
+        #         "hessian_rms",
+        #         PYSCF_PLOT_FACTORS["hessian_rms"],
+        #         PYSCF_PLOT_FACTORS["hessian_rms"],
+        #     ),
+        #     f"{GROUND_TRUTH_LABEL} Hessian RMS (eV/A^2)",
+        #     "GFN2-xTB Hessian RMS (eV/A^2)",
+        #     f"{XTB_COMPARISON_LABEL} Hessian RMS",
+        #     output_dir / "xtb_gfn2_vs_wB97MD4def2QZVPPD_hessian_rms.png",
+        # ),
         (
             make_pair_rows(
                 ground_truth,
@@ -1141,7 +1157,7 @@ def main() -> None:
     scalar_comparison_methods = [
         # (f"{GROUND_TRUTH_LABEL} vs w. Dens.Fit.", df, PYSCF_PLOT_FACTORS),
         (UMA_COMPARISON_LABEL, uma, UMA_PLOT_FACTORS),
-        (XTB_COMPARISON_LABEL, xtb, PYSCF_PLOT_FACTORS),
+        # (XTB_COMPARISON_LABEL, xtb, PYSCF_PLOT_FACTORS),
         (GXTB_COMPARISON_LABEL, gxtb, PYSCF_PLOT_FACTORS),
         (ORCA_COMPARISON_LABEL, orca, PYSCF_PLOT_FACTORS),
         (PYSCF_COMPARISON_LABEL, no_df, PYSCF_PLOT_FACTORS),
@@ -1174,15 +1190,15 @@ def main() -> None:
             PYSCF_PLOT_FACTORS["hessian_rms"],
             UMA_PLOT_FACTORS["hessian_rms"],
         )
-        + hessian_mae_rows(
-            ground_truth,
-            xtb,
-            XTB_COMPARISON_LABEL,
-            "hessian",
-            "hessian",
-            PYSCF_PLOT_FACTORS["hessian_rms"],
-            PYSCF_PLOT_FACTORS["hessian_rms"],
-        )
+        # + hessian_mae_rows(
+        #     ground_truth,
+        #     xtb,
+        #     XTB_COMPARISON_LABEL,
+        #     "hessian",
+        #     "hessian",
+        #     PYSCF_PLOT_FACTORS["hessian_rms"],
+        #     PYSCF_PLOT_FACTORS["hessian_rms"],
+        # )
         + hessian_mae_rows(
             ground_truth,
             gxtb,
@@ -1211,6 +1227,9 @@ def main() -> None:
             PYSCF_PLOT_FACTORS["hessian_rms"],
         )
     )
+    hessian_mae_by_atoms_rows = [
+        row for row in hessian_mae_by_atoms_rows if int(row["sample"]) not in EXCLUDED_HESSIAN_MAE_SAMPLES
+    ]
     hessian_comparison_order = list(reversed(ordered_comparisons_by_mean_metric(hessian_mae_by_atoms_rows, "hessian_mae")))
     error_plot_specs = [
         (
@@ -1304,7 +1323,7 @@ def main() -> None:
             args.negative_eigval_threshold,
         )
         + eckart_summary_rows(ground_truth_modes, uma_modes, UMA_COMPARISON_LABEL, args.negative_eigval_threshold)
-        + eckart_summary_rows(ground_truth_modes, xtb_modes, XTB_COMPARISON_LABEL, args.negative_eigval_threshold)
+        # + eckart_summary_rows(ground_truth_modes, xtb_modes, XTB_COMPARISON_LABEL, args.negative_eigval_threshold)
         + eckart_summary_rows(ground_truth_modes, gxtb_modes, GXTB_COMPARISON_LABEL, args.negative_eigval_threshold)
         + eckart_summary_rows(
             ground_truth_modes,

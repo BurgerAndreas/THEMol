@@ -1,0 +1,9 @@
+method_id,method_display_name,category,hessian_count,sample_count,atom_count_min,atom_count_max,total_size_bytes,directory
+g_xtb,g-xTB,semiempirical,40,40,3,50,5103376,hessians/semiempirical/g_xtb
+gfn2_xtb,GFN2-xTB,semiempirical,10,10,3,28,523664,hessians/semiempirical/gfn2_xtb
+orca_wb97m_d4_def2_qzvppd,ORCA wB97M-D4/def2-QZVPPD,dft,37,37,3,49,4332912,hessians/orca/wb97m_d4_def2_qzvppd
+orca_wb97m_d4_def2_tzvpd,ORCA wB97M-D4/def2-TZVPD,dft,45,45,3,50,6589520,hessians/orca/wb97m_d4_def2_tzvpd
+pyscf_ccsd_t_cbs,PySCF RCCSD(T)/CBS,ab_initio,2,2,3,5,37384,hessians/pyscf/ccsd_t_cbs
+pyscf_wb97m_v_def2_tzvpd,PySCF wB97M-V/def2-TZVPD,dft,28,28,3,24,1766464,hessians/pyscf/wb97m_v_def2_tzvpd
+pyscf_wb97m_v_def2_tzvpd_density_fit,PySCF wB97M-V/def2-TZVPD with density fitting,dft,9,9,3,24,534976,hessians/pyscf/wb97m_v_def2_tzvpd_density_fit
+uma_s_1p2_omol,UMA-S-1.2 OMol autograd Hessian,machine_learning,30,30,3,34,2129048,hessians/ml/uma_s_1p2_omol

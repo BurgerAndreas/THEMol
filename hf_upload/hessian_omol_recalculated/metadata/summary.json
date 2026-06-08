@@ -1,0 +1,105 @@
+{
+  "created_at_utc": "2026-06-08T16:25:17.213380+00:00",
+  "repo_id": "andreasburger/Hessian-OMol",
+  "source_directory": "results/hessians",
+  "included_hdf5_files": 201,
+  "excluded_files": [
+    "results/hessians/xtb_gfn2/test_sample_47783_xtb_gfn2.h5"
+  ],
+  "total_size_bytes": 21017344,
+  "unique_samples": 57,
+  "sample_id_min": 0,
+  "sample_id_max": 47783,
+  "atom_count_min": 3,
+  "atom_count_max": 50,
+  "methods": [
+    {
+      "method_id": "g_xtb",
+      "method_display_name": "g-xTB",
+      "category": "semiempirical",
+      "hessian_count": 40,
+      "sample_count": 40,
+      "atom_count_min": 3,
+      "atom_count_max": 50,
+      "total_size_bytes": 5103376,
+      "directory": "hessians/semiempirical/g_xtb"
+    },
+    {
+      "method_id": "gfn2_xtb",
+      "method_display_name": "GFN2-xTB",
+      "category": "semiempirical",
+      "hessian_count": 10,
+      "sample_count": 10,
+      "atom_count_min": 3,
+      "atom_count_max": 28,
+      "total_size_bytes": 523664,
+      "directory": "hessians/semiempirical/gfn2_xtb"
+    },
+    {
+      "method_id": "orca_wb97m_d4_def2_qzvppd",
+      "method_display_name": "ORCA wB97M-D4/def2-QZVPPD",
+      "category": "dft",
+      "hessian_count": 37,
+      "sample_count": 37,
+      "atom_count_min": 3,
+      "atom_count_max": 49,
+      "total_size_bytes": 4332912,
+      "directory": "hessians/orca/wb97m_d4_def2_qzvppd"
+    },
+    {
+      "method_id": "orca_wb97m_d4_def2_tzvpd",
+      "method_display_name": "ORCA wB97M-D4/def2-TZVPD",
+      "category": "dft",
+      "hessian_count": 45,
+      "sample_count": 45,
+      "atom_count_min": 3,
+      "atom_count_max": 50,
+      "total_size_bytes": 6589520,
+      "directory": "hessians/orca/wb97m_d4_def2_tzvpd"
+    },
+    {
+      "method_id": "pyscf_ccsd_t_cbs",
+      "method_display_name": "PySCF RCCSD(T)/CBS",
+      "category": "ab_initio",
+      "hessian_count": 2,
+      "sample_count": 2,
+      "atom_count_min": 3,
+      "atom_count_max": 5,
+      "total_size_bytes": 37384,
+      "directory": "hessians/pyscf/ccsd_t_cbs"
+    },
+    {
+      "method_id": "pyscf_wb97m_v_def2_tzvpd",
+      "method_display_name": "PySCF wB97M-V/def2-TZVPD",
+      "category": "dft",
+      "hessian_count": 28,
+      "sample_count": 28,
+      "atom_count_min": 3,
+      "atom_count_max": 24,
+      "total_size_bytes": 1766464,
+      "directory": "hessians/pyscf/wb97m_v_def2_tzvpd"
+    },
+    {
+      "method_id": "pyscf_wb97m_v_def2_tzvpd_density_fit",
+      "method_display_name": "PySCF wB97M-V/def2-TZVPD with density fitting",
+      "category": "dft",
+      "hessian_count": 9,
+      "sample_count": 9,
+      "atom_count_min": 3,
+      "atom_count_max": 24,
+      "total_size_bytes": 534976,
+      "directory": "hessians/pyscf/wb97m_v_def2_tzvpd_density_fit"
+    },
+    {
+      "method_id": "uma_s_1p2_omol",
+      "method_display_name": "UMA-S-1.2 OMol autograd Hessian",
+      "category": "machine_learning",
+      "hessian_count": 30,
+      "sample_count": 30,
+      "atom_count_min": 3,
+      "atom_count_max": 34,
+      "total_size_bytes": 2129048,
+      "directory": "hessians/ml/uma_s_1p2_omol"
+    }
+  ]
+}
