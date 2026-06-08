@@ -1,42 +1,34 @@
-# Benchmarking THEMol Hessians
+# Benchmarking Levels of Theory for Hessians
 
-The goal of this repo is to recalculate some of the .h5 Hessians here from the THEMol dataset (B3LYP-D3BJ/dzvp) at different levels of theory and compare. 
+The goal of this repo is to compare different levels of theory for computing Hessians for closed-shell organic molecules up to 50 atoms.
 
-As "ground truth" we use analytic Hessians at ωB97M-D4/def2-QZVPPD level of theory from ORCA. Additionally we compare other DFT methods from ORCA, PySCF, UMA autograd Hessians, and GFN2-xTB and g-xTB numerical Hessians.
+As "ground truth" we use analytic Hessians at ωB97M-D4/def2-QZVPPD from ORCA. Additionally we compare wB97M-D4/def2-TZVPD ORCA, ωB97M-V/def2-TZVPD PySCF, UMA autograd Hessians, and GFN2-xTB and g-xTB numerical Hessians.
+The geometries are from the [THEMol dataset](https://arxiv.org/abs/2605.14973) (B3LYP-D3BJ/dzvp). 
 
-All calculations were done on th Trillium cluster of the Digital Research Alliance of Canada.
+All calculations were done on the Trillium cluster of the Digital Research Alliance of Canada.
 Each job used a full node with 192 cores, 749G memory, and 2x AMD EPYC 9655 (Zen 5) @ 2.6 GHz CPUs.	
 
-You can find the Hessians here: https://huggingface.co/datasets/andreasburger/Hessian-OMol
+You can find the Hessians here: https://huggingface.co/datasets/andreasburger/Hessians-LoT
 
 ## Results
 
-On 10 Hessians with 3-28 atoms:
-
 | Method | H MAE | EigVals MAE | \|cos first EigVec\| |
 |---|---:|---:|---:|
-| ωB97M-V/def2-TZVPD vs GFN2-xTB | 0.465 | 0.742 | 0.742 |
-| ωB97M-V/def2-TZVPD vs g-xTB | 0.402 | 0.542 | 0.774 |
-| ωB97M-V/def2-TZVPD vs B3LYP-D3BJ/dzvp | 0.151 | 0.214 | 0.747 |
-| ωB97M-V/def2-TZVPD vs wB97M-D4/def2-TZVPD | 0.021 | 0.022 | 0.990 |
-| ωB97M-V/def2-TZVPD vs UMA | 0.092 | 0.032 | 0.986 |
+| ωB97M-D4/def2-QZVPPD vs g-xTB | 0.303 | 0.629 | 0.707 |
+| ωB97M-D4/def2-QZVPPD vs B3LYP-D3BJ/dzvp | 0.109 | 0.291 | 0.677 |
+| ωB97M-D4/def2-QZVPPD vs UMA | 0.052 | 0.104 | 0.954 |
+| ωB97M-D4/def2-QZVPPD vs ωB97M-V/def2-TZVPD | 0.038 | 0.098 | 0.977 |
+| ωB97M-D4/def2-QZVPPD vs ωB97M-D4/def2-TZVPD | 0.016 | 0.081 | 0.974 |
 
-For comparison, here are the results we reported for our [Hessian Interatomic Potentials (HIP)](https://arxiv.org/abs/2509.21624) paper, where the methods were all trained on ωB97x/6-31G(d):
+For comparison, here are the results we reported in our [Hessian Interatomic Potentials (HIP)](https://arxiv.org/abs/2509.21624) paper, where the methods were all trained on ωB97x/6-31G(d):
 
 | Model | Hessian Method | Hessian Trained | H MAE ↓ eV/Å² | EigVals λ MAE ↓ eV/Å² | \|cos first EigVec v₁\| ↑ | First EigVal λ₁ ↓ eV/Å² | Time ↓ ms |
 |---|---|---:|---:|---:|---:|---:|---:|
-| AlphaNet (E-F) |  |  | 0.502 | 1.190 | 0.903 | 0.245 | 728.6 |
-| LEFTNet-DF (E-F) | AD |  | 1.650 | 2.247 | 0.505 | 1.362 | 331.4 |
-| LEFTNet-CF (E-F) | AD |  | 0.364 | 1.011 | 0.947 | 0.130 | 1047.9 |
 | EquiformerV2 (E-F) | AD |  | 2.254 | 4.199 | 0.279 | 1.372 | 564.9 |
-| AlphaNet |  | ✓ | 0.390 | 0.790 | 0.899 | 0.244 | 747.0 |
-| LEFTNet-DF | AD | ✓ | 0.200 | 0.172 | 0.937 | 0.136 | 332.2 |
-| LEFTNet-CF | AD | ✓ | 0.153 | 0.226 | 0.951 | 0.127 | 1051.6 |
 | EquiformerV2 | AD | ✓ | 0.077 | 0.070 | 0.916 | 0.104 | 562.3 |
-| HIP-EquiformerV2 | HIP |  | 0.030 | 0.063 | 0.982 | 0.031 | 38.5 |
 | HIP-EquiformerV2* | HIP | ✓ | 0.020 | 0.041 | 0.982 | 0.031 | 31.4 |
 
-It seems UMA-S-1.2 fitted ωB97M-V/def2-TZVPD train split as accurately as HIP fitted the ωB97x/6-31G(d) test split. Let's assume ωB97M-V/def2-TZVPD and ωB97x/6-31G(d) are equally easy to fit, and ignore that UMA was trained on vastly more samples than HIP (500 Mio vs 1.7 Mio). This suggests that one could train HIP on UMA autograd Hessians instead of ωB97M-V/def2-TZVPD Hessians, without being bottlenecked by the UMA accuracy. 
+It seems UMA-S-1.2 fitted it's ωB97M-V/def2-TZVPD train split as accurately as HIP fitted the ωB97x/6-31G(d) test split. Let's assume ωB97M-V/def2-TZVPD and ωB97x/6-31G(d) are equally easy to fit, and ignore that UMA was trained on vastly more samples than HIP (500 Mio vs 1.7 Mio). This suggests that one could train HIP on UMA autograd Hessians instead of ωB97M-V/def2-TZVPD Hessians, without being bottlenecked by the UMA autograd accuracy. 
 
 
 
